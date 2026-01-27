@@ -4,134 +4,208 @@ package main
 	CTM -- Controller to Mouse
 	==========================
 	A small script that converts convroller input into mouse input
+
+	XINPUT_STATE{dwPacketNumber = 225534, Gamepad = XINPUT_GAMEPAD{wButtons = XINPUT_GAMEPAD_BUTTON{DPAD_UP}, bLeftTrigger = 0, bRightTrigger = 0, sThumbLX = 0, sThumbLY = 0, sThumbRX = 0, sThumbRY = 0}}	
 */
 
 import "core:fmt"
 // import "core:time"
+// import "core:math"
 import win "core:sys/windows"
-import "core:math"
 
 
-XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE ::  7849
+XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE :: 7849
 XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE :: 8689
 INPUT_GAMEPAD_TRIGGER_THRESHOLD :: 30
 
-ctm_enabled:bool
+State :: enum {
+	PRESSED,
+	RELEASED,
+}
 
 
+Button :: struct {
+	pressed: bool,
+	key:     win.WORD,
+}
+
+
+Controller :: struct {
+	dpad_up:    Button,
+	dpad_down:  Button,
+	dpad_left:  Button,
+	dpad_right: Button,
+	face_up:    Button,
+	face_down:  Button,
+	face_left:  Button,
+	face_right: Button,
+}
+controller: Controller
+
+// buttons: ButtonsPressed
+
+previous_key: win.WORD
+has_sent: bool = false
+
+
+setup_defaults :: proc() {
+
+	/*Setups up the default controls for the controller to keyboard mapping
+	(Defaults are actually made for Hytale since that's the game being used during testing)*/
+
+	// dpad
+	controller.dpad_up.key = win.VK_W
+	controller.dpad_down.key = win.VK_S
+	controller.dpad_left.key = win.VK_A
+	controller.dpad_right.key = win.VK_D
+
+	// face buttons (a b x y , triangle, cirlce square x)
+	controller.face_up.key = win.VK_TAB
+	controller.face_down.key = win.VK_SPACE
+	// controller.face_left.key =
+}
+
+send_input :: proc(key: win.WORD, key_state: State) {
+
+	inputs: [1]win.INPUT
+
+	switch key_state {
+	case .PRESSED:
+		inputs[0].type = .KEYBOARD // event comes from the keyboard
+		inputs[0].ki.wVk = key
+
+	case .RELEASED:
+		inputs[0].type = .KEYBOARD // event comes from the keyboard
+		inputs[0].ki.wVk = key
+		inputs[0].ki.dwFlags = 0x0002 // release key dw flag
+	}
+
+
+	win.SendInput(
+		cInputs = len(inputs),
+		pInputs = raw_data(inputs[:]),
+		cbSize = size_of(win.INPUT),
+	) // -> UINT ---
+
+
+}
 
 main :: proc() {
 
-	smoothing:win.INT = 1
-	right_thumb_counter:[2]win.INT
-	frame_counter:int = 0
-	max_frame_counter:int = 100
-	speed:f64 = 100
-
+	setup_defaults()
 
 	for {
-		user:win.XUSER
-		state:win.XINPUT_STATE
+
+		user: win.XUSER
+		state: win.XINPUT_STATE
 		system_err := win.XInputGetState(user, &state)
 
-		rx := cast(f64)state.Gamepad.sThumbLX
-		ry := cast(f64)state.Gamepad.sThumbLY
-
-		dx:f64
-		dy:f64
-		
-		magnitude := math.sqrt_f64(rx * rx + ry + ry)
-
-		normalized_lx := rx / magnitude
-		normalized_ly := ry / magnitude
-
-		normalized_magnitude := 0
-
-		// if magnitude > XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE {
-		// 	if magnitude > 32767 do magnitude = 32767
-
-		// 	magnitude -= XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE
-
-		// 	normalized_magnitude = cast(int)magnitude / (32767 - XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE)
-		// } else {
-		// 	magnitude = 0
-		// 	normalized_magnitude = 0
-		// }
-
-		if math.abs(rx) < XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE do rx = 0
-		if math.abs(ry) < XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE do ry = 0
-
-		if magnitude > 0 {
-			nx := rx / magnitude
-			ny := ry / magnitude
-
-
-			normalized_magnitude = cast(int)min(magnitude / 32767.0, 1.0)
-
-			dx = nx * cast(f64)normalized_magnitude * speed
-			dy = ny * cast(f64)normalized_magnitude * speed
-			
+		// DPAD CHECKS -- UP
+		if win.XINPUT_GAMEPAD_BUTTON_BIT.DPAD_UP in state.Gamepad.wButtons {
+			if !controller.dpad_up.pressed {
+				controller.dpad_up.pressed = true
+				send_input(controller.dpad_up.key, .PRESSED)
+			}
+		} else {
+			if controller.dpad_up.pressed {
+				controller.dpad_up.pressed = false
+				send_input(controller.dpad_up.key, .RELEASED)
+			}
 		}
 
-		
-		if state.Gamepad.wButtons == {.LEFT_THUMB, .LEFT_SHOULDER, .RIGHT_SHOULDER} && frame_counter <= max_frame_counter {
-			fmt.println(ctm_enabled)
-			// fmt.println(state.Gamepad.wButtons)
-			ctm_enabled = true
-			
-		} // end of buttom press check
-		
-		if state.Gamepad.wButtons == {.RIGHT_THUMB, .LEFT_SHOULDER, .RIGHT_SHOULDER} {
-			// fmt.println(ctm_enabled)
-			// fmt.println(state.Gamepad.wButtons)
-			ctm_enabled = false			
-		} // end of buttom press end check 
-		
-		if ctm_enabled {
-			
-			win.SetCursorPos(cast(win.INT)dx, cast(win.INT)dy)
-			// inputs:[1]win.INPUT
-			// inputs[0].type = .MOUSE
-			// inputs[0].mi = {
-			// 	dx = cast(win.LONG)dx,
-			// 	dy = cast(win.LONG)dy,
-			// 	dwFlags = win.MOUSEEVENTF_MOVE
-			// }
+		// DPAD CHECKS -- DOWN
+		if win.XINPUT_GAMEPAD_BUTTON_BIT.DPAD_DOWN in state.Gamepad.wButtons {
+			if !controller.dpad_down.pressed {
+				controller.dpad_down.pressed = true
+				send_input(controller.dpad_down.key, .PRESSED)
+			}
+		} else {
+			if controller.dpad_down.pressed {
+				controller.dpad_down.pressed = false
+				send_input(controller.dpad_down.key, .RELEASED)
+			}
+		}
 
-			// fmt.println(inputs[0])
-			// win.SendInput(cInputs = 0, pInputs = raw_data(inputs[:]), cbSize = size_of(win.INPUT)) // -> UINT ---
+		// DPAD CHECKS -- LEFT
+		if win.XINPUT_GAMEPAD_BUTTON_BIT.DPAD_LEFT in state.Gamepad.wButtons {
+			if !controller.dpad_left.pressed {
+				controller.dpad_left.pressed = true
+				send_input(controller.dpad_left.key, .PRESSED)
+			}
+		} else {
+			if controller.dpad_left.pressed {
+				controller.dpad_left.pressed = false
+				send_input(controller.dpad_left.key, .RELEASED)
+			}
+		}
 
-			
-			// // Right Thumbstick Pointing right
-			// if state.Gamepad.sThumbRX > 0 && frame_counter == max_frame_counter {
-			// 	right_thumb_counter[0] += 1
-			// 	win.ShowCursor(win.TRUE)
-			// 	win.SetCursorPos(cast(win.INT)right_thumb_counter[0], cast(win.INT)right_thumb_counter[1])
-			// }
-			// // Right Thumbstick Pointing left
-			// if state.Gamepad.sThumbRX < 0 && frame_counter == max_frame_counter {
-			// 	right_thumb_counter[0] -= 1
-			// 	win.ShowCursor(win.TRUE)
-			// 	win.SetCursorPos(cast(win.INT)right_thumb_counter[0], cast(win.INT)right_thumb_counter[1])
-			// }
-			// // Right Thumbstick Pointing Up
-			// if state.Gamepad.sThumbRY > 0 && frame_counter == max_frame_counter {
-			// 	right_thumb_counter[1] -= 1
-			// 	win.ShowCursor(win.TRUE)
-			// 	win.SetCursorPos(cast(win.INT)right_thumb_counter[0], cast(win.INT)right_thumb_counter[1])
-			// }
-			
-			// // Right Thumbstick Pointing Down
-			// if state.Gamepad.sThumbRY < 0 && frame_counter == max_frame_counter {
-			// 	right_thumb_counter[1] += 1
-			// 	win.ShowCursor(win.TRUE)
-			// 	win.SetCursorPos(cast(win.INT)right_thumb_counter[0], cast(win.INT)right_thumb_counter[1])
-			// }
-			
-			// win.ShowCursor(win.TRUE)
-		} // end of ctm_enabled if's else branch
-		// frame_counter += 1
+		// DPAD CHECKS -- RIGHT
+		if win.XINPUT_GAMEPAD_BUTTON_BIT.DPAD_RIGHT in state.Gamepad.wButtons {
+			if !controller.dpad_right.pressed {
+				controller.dpad_right.pressed = true
+				send_input(controller.dpad_right.key, .PRESSED)
+			}
+		} else {
+			if controller.dpad_right.pressed {
+				controller.dpad_right.pressed = false
+				send_input(controller.dpad_right.key, .RELEASED)
+			}
+		}
 
-		// if frame_counter > max_frame_counter do frame_counter = 0
+
+		// FACE CHECKS -- UP (Y (xbox), Triangle (playstation), X (Nintendo))
+		if win.XINPUT_GAMEPAD_BUTTON_BIT.Y in state.Gamepad.wButtons {
+			if !controller.face_up.pressed {
+				controller.face_up.pressed = true
+				send_input(controller.face_up.key, .PRESSED)
+			}
+		} else {
+			if controller.face_up.pressed {
+				controller.face_up.pressed = false
+				send_input(controller.face_up.key, .RELEASED)
+			}
+		}
+
+
+		// FACE CHECKS -- DOWN (A (xbox), X (playstation), B (Nintendo))
+		if win.XINPUT_GAMEPAD_BUTTON_BIT.A in state.Gamepad.wButtons {
+			if !controller.face_down.pressed {
+				controller.face_down.pressed = true
+				send_input(controller.face_down.key, .PRESSED)
+			}
+		} else {
+			if controller.face_down.pressed {
+				controller.face_down.pressed = false
+				send_input(controller.face_down.key, .RELEASED)
+			}
+		}
+
+		// FACE CHECKS -- LEFT (X (xbox), Square (playstation), Y (Nintendo))
+		if win.XINPUT_GAMEPAD_BUTTON_BIT.X in state.Gamepad.wButtons {
+			if !controller.face_left.pressed {
+				controller.face_left.pressed = true
+				send_input(controller.face_left.key, .PRESSED)
+			}
+		} else {
+			if controller.face_left.pressed {
+				controller.face_left.pressed = false
+				send_input(controller.face_left.key, .RELEASED)
+			}
+		}
+
+		// FACE CHECKS -- RIGHT (B (xbox), CIRCLE (playstation), A (Nintendo))
+		if win.XINPUT_GAMEPAD_BUTTON_BIT.X in state.Gamepad.wButtons {
+			if !controller.face_right.pressed {
+				controller.face_right.pressed = true
+				send_input(controller.face_right.key, .PRESSED)
+			}
+		} else {
+			if controller.face_right.pressed {
+				controller.face_right.pressed = false
+				send_input(controller.face_right.key, .RELEASED)
+			}
+		}
+
+
 	} // End of infinite for loop
 }
