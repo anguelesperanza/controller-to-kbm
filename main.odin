@@ -10,13 +10,16 @@ package main
 
 import "core:fmt"
 // import "core:time"
-// import "core:math"
+import "core:math"
 import win "core:sys/windows"
 
 
 XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE :: 7849
 XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE :: 8689
 INPUT_GAMEPAD_TRIGGER_THRESHOLD :: 30
+
+
+MOUSE_SPEED :: 5.0 // tweak to taste
 
 State :: enum {
 	PRESSED,
@@ -25,20 +28,24 @@ State :: enum {
 
 
 Button :: struct {
-	pressed: bool,
-	key:     win.WORD,
+	pressed:       bool,
+	key:           win.WORD,
+	mouse_button:  win.DWORD,
+	mouse_release: win.DWORD,
 }
 
 
 Controller :: struct {
-	dpad_up:    Button,
-	dpad_down:  Button,
-	dpad_left:  Button,
-	dpad_right: Button,
-	face_up:    Button,
-	face_down:  Button,
-	face_left:  Button,
-	face_right: Button,
+	dpad_up:      Button,
+	dpad_down:    Button,
+	dpad_left:    Button,
+	dpad_right:   Button,
+	face_up:      Button,
+	face_down:    Button,
+	face_left:    Button,
+	face_right:   Button,
+	left_bumber:  Button,
+	right_bumber: Button,
 }
 controller: Controller
 
@@ -62,10 +69,32 @@ setup_defaults :: proc() {
 	// face buttons (a b x y , triangle, cirlce square x)
 	controller.face_up.key = win.VK_TAB
 	controller.face_down.key = win.VK_SPACE
-	// controller.face_left.key =
+	controller.face_left.key = win.VK_F
+	controller.face_right.key = win.VK_LCONTROL
+
+	// Bumpers
+	controller.left_bumber.mouse_button = win.MOUSEEVENTF_RIGHTDOWN
+	controller.left_bumber.mouse_release = win.MOUSEEVENTF_RIGHTUP
+	controller.right_bumber.mouse_button = win.MOUSEEVENTF_LEFTDOWN
+	controller.right_bumber.mouse_release = win.MOUSEEVENTF_LEFTUP
+}
+
+send_mouse_input :: proc(event: win.DWORD) {
+	inputs: [1]win.INPUT
+
+	inputs[0].type = .MOUSE
+	inputs[0].mi.dwFlags = event
+
+	win.SendInput(
+		cInputs = len(inputs),
+		pInputs = raw_data(inputs[:]),
+		cbSize = size_of(win.INPUT),
+	)
 }
 
 send_input :: proc(key: win.WORD, key_state: State) {
+
+	/*Sends keyboard innput*/
 
 	inputs: [1]win.INPUT
 
@@ -90,6 +119,23 @@ send_input :: proc(key: win.WORD, key_state: State) {
 
 }
 
+send_mouse_move :: proc(dx: i32, dy: i32) {
+	/*Moves the mouse based on the dx and dy values provided*/
+	inputs: [1]win.INPUT
+	inputs[0] = win.INPUT{}
+
+	inputs[0].type = .MOUSE
+	inputs[0].mi.dx = dx
+	inputs[0].mi.dy = dy
+	inputs[0].mi.dwFlags = win.MOUSEEVENTF_MOVE
+
+	win.SendInput(
+		cInputs = len(inputs),
+		pInputs = raw_data(inputs[:]),
+		cbSize = size_of(win.INPUT),
+	)
+}
+
 main :: proc() {
 
 	setup_defaults()
@@ -99,6 +145,33 @@ main :: proc() {
 		user: win.XUSER
 		state: win.XINPUT_STATE
 		system_err := win.XInputGetState(user, &state)
+
+
+		// Move right thumstick to move mouse
+
+		// RIGHT STICK → MOUSE MOVEMENT
+		rx := state.Gamepad.sThumbRX
+		ry := state.Gamepad.sThumbRY
+
+		// deadzone
+		if math.abs(cast(win.SHORT)rx) < XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE do rx = 0
+		if math.abs(cast(win.SHORT)ry) < XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE do ry = 0
+
+		if rx != 0 || ry != 0 {
+			mag := math.sqrt(f32(rx * rx + ry * ry))
+
+			if mag > 0 {
+				nx := f32(rx) / mag
+				ny := f32(ry) / mag
+				scaled := math.min(mag / 32767.0, 1.0)
+
+				dx := nx * scaled * MOUSE_SPEED
+				dy := ny * scaled * MOUSE_SPEED
+
+				send_mouse_move(i32(dx), i32(-dy))
+			}
+		}
+
 
 		// DPAD CHECKS -- UP
 		if win.XINPUT_GAMEPAD_BUTTON_BIT.DPAD_UP in state.Gamepad.wButtons {
@@ -194,7 +267,7 @@ main :: proc() {
 		}
 
 		// FACE CHECKS -- RIGHT (B (xbox), CIRCLE (playstation), A (Nintendo))
-		if win.XINPUT_GAMEPAD_BUTTON_BIT.X in state.Gamepad.wButtons {
+		if win.XINPUT_GAMEPAD_BUTTON_BIT.B in state.Gamepad.wButtons {
 			if !controller.face_right.pressed {
 				controller.face_right.pressed = true
 				send_input(controller.face_right.key, .PRESSED)
@@ -206,6 +279,32 @@ main :: proc() {
 			}
 		}
 
+
+		// LEFT BUMPER → LEFT CLICK
+		if win.XINPUT_GAMEPAD_BUTTON_BIT.LEFT_SHOULDER in state.Gamepad.wButtons {
+			if !controller.left_bumber.pressed {
+				controller.left_bumber.pressed = true
+				send_mouse_input(controller.left_bumber.mouse_button)
+			}
+		} else {
+			if controller.left_bumber.pressed {
+				controller.left_bumber.pressed = false
+				send_mouse_input(controller.left_bumber.mouse_release)
+			}
+		}
+
+		// RIGHT BUMPER → RIGHT CLICK
+		if win.XINPUT_GAMEPAD_BUTTON_BIT.RIGHT_SHOULDER in state.Gamepad.wButtons {
+			if !controller.right_bumber.pressed {
+				controller.right_bumber.pressed = true
+				send_mouse_input(event = controller.right_bumber.mouse_button)
+			}
+		} else {
+			if controller.right_bumber.pressed {
+				controller.right_bumber.pressed = false
+				send_mouse_input(controller.right_bumber.mouse_release)
+			}
+		}
 
 	} // End of infinite for loop
 }
