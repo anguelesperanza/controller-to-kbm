@@ -5,7 +5,12 @@ package main
 	==========================
 	A small script that converts convroller input into mouse input
 
-	XINPUT_STATE{dwPacketNumber = 225534, Gamepad = XINPUT_GAMEPAD{wButtons = XINPUT_GAMEPAD_BUTTON{DPAD_UP}, bLeftTrigger = 0, bRightTrigger = 0, sThumbLX = 0, sThumbLY = 0, sThumbRX = 0, sThumbRY = 0}}	
+	XINPUT_STATE{dwPacketNumber = 225534, Gamepad = XINPUT_GAMEPAD{wButtons = XINPUT_GAMEPAD_BUTTON{DPAD_UP}, bLeftTrigger = 0, bRightTrigger = 0, sThumbLX = 0, sThumbLY = 0, sThumbRX = 0, sThumbRY = 0}}
+
+
+	Resources:
+	Thumbstick and Deadzone:https://learn.microsoft.com/en-us/windows/win32/xinput/getting-started-with-xinput
+	AI for validation checks, questions, and general fixes
 */
 
 import "core:fmt"
@@ -13,19 +18,18 @@ import "core:fmt"
 import "core:math"
 import win "core:sys/windows"
 
-
 XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE :: 7849
 XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE :: 8689
 INPUT_GAMEPAD_TRIGGER_THRESHOLD :: 30
 
+// ingame mouse speed set to 0.3 for left/right + top/down
 
-MOUSE_SPEED :: 5.0 // tweak to taste
+MOUSE_SPEED :: 0.5 // tweak to taste
 
 State :: enum {
 	PRESSED,
 	RELEASED,
 }
-
 
 Button :: struct {
 	pressed:       bool,
@@ -33,7 +37,6 @@ Button :: struct {
 	mouse_button:  win.DWORD,
 	mouse_release: win.DWORD,
 }
-
 
 Controller :: struct {
 	dpad_up:      Button,
@@ -46,6 +49,12 @@ Controller :: struct {
 	face_right:   Button,
 	left_bumber:  Button,
 	right_bumber: Button,
+	left_thumb_up:Button,
+	left_thumb_down:Button,
+	left_thumb_left:Button,
+	left_thumb_right:Button,
+	
+	
 }
 controller: Controller
 
@@ -53,7 +62,6 @@ controller: Controller
 
 previous_key: win.WORD
 has_sent: bool = false
-
 
 setup_defaults :: proc() {
 
@@ -77,9 +85,17 @@ setup_defaults :: proc() {
 	controller.left_bumber.mouse_release = win.MOUSEEVENTF_RIGHTUP
 	controller.right_bumber.mouse_button = win.MOUSEEVENTF_LEFTDOWN
 	controller.right_bumber.mouse_release = win.MOUSEEVENTF_LEFTUP
+
+
+	// Left thumb stick (treating as a key)
+	controller.left_thumb_up.key = win.VK_W
+	controller.left_thumb_down.key = win.VK_S
+	controller.left_thumb_left.key = win.VK_A
+	controller.left_thumb_right.key = win.VK_D
 }
 
 send_mouse_input :: proc(event: win.DWORD) {
+	/*Sends mouse input (not mouse movement)*/
 	inputs: [1]win.INPUT
 
 	inputs[0].type = .MOUSE
@@ -109,7 +125,6 @@ send_input :: proc(key: win.WORD, key_state: State) {
 		inputs[0].ki.dwFlags = 0x0002 // release key dw flag
 	}
 
-
 	win.SendInput(
 		cInputs = len(inputs),
 		pInputs = raw_data(inputs[:]),
@@ -120,7 +135,7 @@ send_input :: proc(key: win.WORD, key_state: State) {
 }
 
 send_mouse_move :: proc(dx: i32, dy: i32) {
-	/*Moves the mouse based on the dx and dy values provided*/
+	/*Moves the mouse based on the dx and dy values provided (not clicking events)*/
 	inputs: [1]win.INPUT
 	inputs[0] = win.INPUT{}
 
@@ -147,32 +162,104 @@ main :: proc() {
 		system_err := win.XInputGetState(user, &state)
 
 
-		// Move right thumstick to move mouse
+		lx := cast(f16)state.Gamepad.sThumbLX
+		ly := cast(f16)state.Gamepad.sThumbLY
 
+		magnitude_left:f16 = math.sqrt(lx * lx + ly *ly)
+
+		normalized_lx:f16
+		normalized_ly:f16
+
+		if magnitude_left != 0 {
+			normalized_lx = lx / magnitude_left
+			normalized_ly = ly / magnitude_left
+		}
+			
+		
+		normalized_magnitude_left:f16 = 0
+
+		// Thumbstick (left) is not in the deadzone
+		if magnitude_left > XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE {
+			if magnitude_left > 32767 do magnitude_left = 32767
+
+			magnitude_left -= XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE
+			normalized_magnitude_left = magnitude_left / (32767 - XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE)
+			
+		} else {
+			// Thumbstick (left) is in the deadzone
+			magnitude_left = 0
+			normalized_magnitude_left = 0
+		}
+
+		// fmt.println("MAGNITUDE LEFT", magnitude_left, "NORMALIZED MAGNITUDE LEFT", normalized_magnitude_left, "LX", lx)
+		fmt.println("Normalized LX ", normalized_lx, "Normalized LY", normalized_ly)
+		
+		if normalized_ly == 0 {
+			if !controller.left_thumb_up.pressed {
+				controller.left_thumb_up.pressed = true
+				send_input(key = controller.left_thumb_up.key, key_state = .PRESSED)
+			}
+		} else {
+			if controller.left_thumb_up.pressed {
+				controller.left_thumb_up.pressed = false
+				send_input(key = controller.left_thumb_up.key, key_state = .RELEASED)
+			}
+		}
+		if normalized_ly < -1  {
+			if !controller.left_thumb_down.pressed {
+				controller.left_thumb_down.pressed = true
+				send_input(key = controller.left_thumb_down.key, key_state = .PRESSED)
+			}
+		} else {
+			if controller.left_thumb_down.pressed {
+				controller.left_thumb_down.pressed = false
+				send_input(key = controller.left_thumb_down.key, key_state = .RELEASED)
+		 }
+		}
+
+		// ============================================================================================================
+		
 		// RIGHT STICK → MOUSE MOVEMENT
 		rx := state.Gamepad.sThumbRX
 		ry := state.Gamepad.sThumbRY
 
-		// deadzone
-		if math.abs(cast(win.SHORT)rx) < XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE do rx = 0
-		if math.abs(cast(win.SHORT)ry) < XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE do ry = 0
+		// Normalize thumbstick values to [-1.0, 1.0]
+		normalized_x := f32(rx) / 32767.0
+		normalized_y := f32(ry) / 32767.0
 
-		if rx != 0 || ry != 0 {
-			mag := math.sqrt(f32(rx * rx + ry * ry))
+		// Apply deadzone
+		deadzone_threshold := f32(XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE) / 32767.0
 
-			if mag > 0 {
-				nx := f32(rx) / mag
-				ny := f32(ry) / mag
-				scaled := math.min(mag / 32767.0, 1.0)
+		// Check if the magnitude is within deadzone
+		magnitude := math.sqrt(normalized_x*normalized_x + normalized_y*normalized_y)
 
-				dx := nx * scaled * MOUSE_SPEED
-				dy := ny * scaled * MOUSE_SPEED
-
-				send_mouse_move(i32(dx), i32(-dy))
-			}
+		if magnitude < deadzone_threshold {
+		    // Inside deadzone, set to zero
+		    normalized_x = 0
+		    normalized_y = 0
+		} else {
+		    // Outside deadzone - scale the vector properly
+		    // This ensures smooth diagonal movement
+		    scale := (magnitude - deadzone_threshold) / (1.0 - deadzone_threshold)
+		    if scale < 0 {
+		        scale = 0
+		    }
+    
+		    // Apply the scaling to maintain proper proportions
+		    normalized_x = normalized_x * scale
+		    normalized_y = normalized_y * scale
 		}
 
+		// Apply mouse sensitivity
+		dx := normalized_x * MOUSE_SPEED
+		dy := normalized_y * MOUSE_SPEED
 
+		// Round to integer for mouse movement
+		dx_rounded := i32(math.round(f64(dx)))
+		dy_rounded := i32(math.round(f64(dy)))
+
+		send_mouse_move(dx_rounded, -dy_rounded)
+		
 		// DPAD CHECKS -- UP
 		if win.XINPUT_GAMEPAD_BUTTON_BIT.DPAD_UP in state.Gamepad.wButtons {
 			if !controller.dpad_up.pressed {
