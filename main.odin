@@ -46,24 +46,37 @@ Button :: struct {
 }
 
 Controller :: struct {
+	// dpad
 	dpad_up:      Button,
 	dpad_down:    Button,
 	dpad_left:    Button,
 	dpad_right:   Button,
+
+	// face buttons
 	face_up:      Button,
 	face_down:    Button,
 	face_left:    Button,
 	face_right:   Button,
+
+	// bumbers
 	left_bumber:  Button,
 	right_bumber: Button,
 	left_thumb_up:Button,
+
+	// triggers (nothing here at the moment)
+
+	// left thumbstick
 	left_thumb_down:Button,
 	left_thumb_left:Button,
 	left_thumb_right:Button,
 	left_thumb_click:Button,
-	
-	
+
+
+	// Start / Select
+	start:Button,
+	select:Button,
 }
+
 controller: Controller
 
 // buttons: ButtonsPressed
@@ -101,6 +114,10 @@ setup_defaults :: proc() {
 	controller.left_thumb_left.key = win.VK_A
 	controller.left_thumb_right.key = win.VK_D
 	controller.left_thumb_click.key = win.VK_LSHIFT
+
+	// Start / Select
+	controller.start.key = win.VK_ESCAPE
+	controller.select.key = win.VK_M
 }
 
 get_scroll_index :: proc(direction:Direction) -> win.WORD {
@@ -194,7 +211,7 @@ main :: proc() {
 		state: win.XINPUT_STATE
 		system_err := win.XInputGetState(user, &state)
 
-		fmt.println(state.Gamepad)
+		// if state.Gamepad != {} do fmt.println(state.Gamepad)
 
 		// Normaize input -- not what I want, I want dominate axis check
 		// lx := cast(f16)state.Gamepad.sThumbLX
@@ -303,7 +320,6 @@ main :: proc() {
 				send_input(key = controller.left_thumb_right.key, key_state = .RELEASED)
 		 }
 		}
-
 		
 		if win.XINPUT_GAMEPAD_BUTTON_BIT.LEFT_THUMB in state.Gamepad.wButtons {
 			if !controller.left_thumb_click.pressed {
@@ -495,5 +511,31 @@ main :: proc() {
 			}
 		}
 
+		// Start
+		if win.XINPUT_GAMEPAD_BUTTON_BIT.START in state.Gamepad.wButtons {
+			if !controller.start.pressed {
+				controller.start.pressed = true
+				send_input(controller.start.key, .PRESSED)
+			}
+		} else {
+			if controller.start.pressed {
+				controller.start.pressed = false
+				send_input(controller.start.key, .RELEASED)
+			}
+		}
+		
+		// Select
+		if win.XINPUT_GAMEPAD_BUTTON_BIT.BACK in state.Gamepad.wButtons {
+			if !controller.select.pressed {
+				controller.select.pressed = true
+				send_input(controller.select.key, .PRESSED)
+			}
+		} else {
+			if controller.select.pressed {
+				controller.select.pressed = false
+				send_input(controller.select.key, .RELEASED)
+			}
+		}
+		
 	} // End of infinite for loop
 }
