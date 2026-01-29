@@ -22,9 +22,16 @@ XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE :: 7849
 XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE :: 8689
 INPUT_GAMEPAD_TRIGGER_THRESHOLD :: 30
 
+scroll_index:int = 0
+
 // ingame mouse speed set to 0.3 for left/right + top/down
 
 MOUSE_SPEED :: 0.5 // tweak to taste
+
+Direction :: enum {
+	LEFT,
+	RIGHT,
+}
 
 State :: enum {
 	PRESSED,
@@ -69,10 +76,10 @@ setup_defaults :: proc() {
 	(Defaults are actually made for Hytale since that's the game being used during testing)*/
 
 	// dpad
-	controller.dpad_up.key = win.VK_W
-	controller.dpad_down.key = win.VK_S
-	controller.dpad_left.key = win.VK_A
-	controller.dpad_right.key = win.VK_D
+	controller.dpad_up.key = win.VK_Z
+	controller.dpad_down.key = win.VK_0
+	controller.dpad_left.key = win.VK_0
+	controller.dpad_right.key = win.VK_0
 
 	// face buttons (a b x y , triangle, cirlce square x)
 	controller.face_up.key = win.VK_TAB
@@ -92,6 +99,32 @@ setup_defaults :: proc() {
 	controller.left_thumb_down.key = win.VK_S
 	controller.left_thumb_left.key = win.VK_A
 	controller.left_thumb_right.key = win.VK_D
+}
+
+get_scroll_index :: proc(direction:Direction) -> win.WORD {
+
+	switch direction {
+		case .LEFT:
+			scroll_index -= 1
+			if scroll_index < 1 do scroll_index = 9
+		case .RIGHT:
+			scroll_index += 1
+			if scroll_index > 9 do scroll_index = 1
+	}
+
+	if scroll_index == 0 do return win.VK_0
+	if scroll_index == 1 do return win.VK_1
+	if scroll_index == 2 do return win.VK_2
+	if scroll_index == 3 do return win.VK_3
+	if scroll_index == 4 do return win.VK_4
+	if scroll_index == 5 do return win.VK_5
+	if scroll_index == 6 do return win.VK_6
+	if scroll_index == 7 do return win.VK_7
+	if scroll_index == 8 do return win.VK_8
+	if scroll_index == 9 do return win.VK_9
+
+	return win.VK_0 // default return the 0 key
+
 }
 
 send_mouse_input :: proc(event: win.DWORD) {
@@ -130,8 +163,6 @@ send_input :: proc(key: win.WORD, key_state: State) {
 		pInputs = raw_data(inputs[:]),
 		cbSize = size_of(win.INPUT),
 	) // -> UINT ---
-
-
 }
 
 send_mouse_move :: proc(dx: i32, dy: i32) {
@@ -161,40 +192,70 @@ main :: proc() {
 		state: win.XINPUT_STATE
 		system_err := win.XInputGetState(user, &state)
 
+		// Normaize input -- not what I want, I want dominate axis check
+		// lx := cast(f16)state.Gamepad.sThumbLX
+		// ly := cast(f16)state.Gamepad.sThumbLY
 
+		// magnitude_left:f16 = math.sqrt(lx * lx + ly *ly)
+
+		// normalized_lx:f16
+		// normalized_ly:f16
+
+		// if magnitude_left != 0 {
+		// 	normalized_lx = lx / magnitude_left
+		// 	normalized_ly = ly / magnitude_left
+		// }
+			
+		
+		// normalized_magnitude_left:f16 = 0
+
+		// // Thumbstick (left) is not in the deadzone
+		// if magnitude_left > XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE {
+		// 	if magnitude_left > 32767 do magnitude_left = 32767
+
+		// 	magnitude_left -= XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE
+		// 	normalized_magnitude_left = magnitude_left / (32767 - XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE)
+			
+		// } else {
+		// 	// Thumbstick (left) is in the deadzone
+		// 	magnitude_left = 0
+		// 	normalized_magnitude_left = 0
+		// }
+
+
+		// domnite axis check
+		
 		lx := cast(f16)state.Gamepad.sThumbLX
 		ly := cast(f16)state.Gamepad.sThumbLY
 
 		magnitude_left:f16 = math.sqrt(lx * lx + ly *ly)
-
+		normalized_magnitude_left:f16 = 0
+		
 		normalized_lx:f16
 		normalized_ly:f16
 
-		if magnitude_left != 0 {
-			normalized_lx = lx / magnitude_left
-			normalized_ly = ly / magnitude_left
-		}
-			
-		
-		normalized_magnitude_left:f16 = 0
-
-		// Thumbstick (left) is not in the deadzone
-		if magnitude_left > XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE {
-			if magnitude_left > 32767 do magnitude_left = 32767
-
-			magnitude_left -= XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE
-			normalized_magnitude_left = magnitude_left / (32767 - XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE)
-			
+		// Deadzone check
+		if math.abs(lx) < XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE &&
+		   math.abs(ly) < XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE {
+		    normalized_lx = 0
+		    normalized_ly = 0
 		} else {
-			// Thumbstick (left) is in the deadzone
-			magnitude_left = 0
-			normalized_magnitude_left = 0
+		    // Determine dominant axis
+		    if math.abs(lx) > math.abs(ly) {
+		        // Horizontal movement
+		        normalized_lx = lx > 0 ? 1 : -1
+		        normalized_ly = 0
+		    } else {
+		        // Vertical movement
+		        normalized_ly = ly > 0 ? 1 : -1
+		        normalized_lx = 0
+		    }
 		}
 
 		// fmt.println("MAGNITUDE LEFT", magnitude_left, "NORMALIZED MAGNITUDE LEFT", normalized_magnitude_left, "LX", lx)
-		fmt.println("Normalized LX ", normalized_lx, "Normalized LY", normalized_ly)
+		// fmt.println("Normalized LX ", normalized_lx, "Normalized LY", normalized_ly)
 		
-		if normalized_ly == 0 {
+		if normalized_ly > 0 {
 			if !controller.left_thumb_up.pressed {
 				controller.left_thumb_up.pressed = true
 				send_input(key = controller.left_thumb_up.key, key_state = .PRESSED)
@@ -205,7 +266,7 @@ main :: proc() {
 				send_input(key = controller.left_thumb_up.key, key_state = .RELEASED)
 			}
 		}
-		if normalized_ly < -1  {
+		if normalized_ly < 0  {
 			if !controller.left_thumb_down.pressed {
 				controller.left_thumb_down.pressed = true
 				send_input(key = controller.left_thumb_down.key, key_state = .PRESSED)
@@ -214,6 +275,28 @@ main :: proc() {
 			if controller.left_thumb_down.pressed {
 				controller.left_thumb_down.pressed = false
 				send_input(key = controller.left_thumb_down.key, key_state = .RELEASED)
+		 }
+		}
+		if normalized_lx < 0  {
+			if !controller.left_thumb_left.pressed {
+				controller.left_thumb_left.pressed = true
+				send_input(key = controller.left_thumb_left.key, key_state = .PRESSED)
+			}
+		} else {
+			if controller.left_thumb_left.pressed {
+				controller.left_thumb_left.pressed = false
+				send_input(key = controller.left_thumb_left.key, key_state = .RELEASED)
+		 }
+		}
+		if normalized_lx > 0  {
+			if !controller.left_thumb_right.pressed {
+				controller.left_thumb_right.pressed = true
+				send_input(key = controller.left_thumb_right.key, key_state = .PRESSED)
+			}
+		} else {
+			if controller.left_thumb_right.pressed {
+				controller.left_thumb_right.pressed = false
+				send_input(key = controller.left_thumb_right.key, key_state = .RELEASED)
 		 }
 		}
 
@@ -290,6 +373,7 @@ main :: proc() {
 		if win.XINPUT_GAMEPAD_BUTTON_BIT.DPAD_LEFT in state.Gamepad.wButtons {
 			if !controller.dpad_left.pressed {
 				controller.dpad_left.pressed = true
+				controller.dpad_left.key = get_scroll_index(.LEFT)
 				send_input(controller.dpad_left.key, .PRESSED)
 			}
 		} else {
@@ -303,6 +387,7 @@ main :: proc() {
 		if win.XINPUT_GAMEPAD_BUTTON_BIT.DPAD_RIGHT in state.Gamepad.wButtons {
 			if !controller.dpad_right.pressed {
 				controller.dpad_right.pressed = true
+				controller.dpad_right.key = get_scroll_index(.RIGHT)
 				send_input(controller.dpad_right.key, .PRESSED)
 			}
 		} else {
