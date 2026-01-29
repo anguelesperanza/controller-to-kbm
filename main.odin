@@ -60,6 +60,7 @@ Controller :: struct {
 	left_thumb_down:Button,
 	left_thumb_left:Button,
 	left_thumb_right:Button,
+	left_thumb_click:Button,
 	
 	
 }
@@ -99,6 +100,7 @@ setup_defaults :: proc() {
 	controller.left_thumb_down.key = win.VK_S
 	controller.left_thumb_left.key = win.VK_A
 	controller.left_thumb_right.key = win.VK_D
+	controller.left_thumb_click.key = win.VK_LSHIFT
 }
 
 get_scroll_index :: proc(direction:Direction) -> win.WORD {
@@ -191,6 +193,8 @@ main :: proc() {
 		user: win.XUSER
 		state: win.XINPUT_STATE
 		system_err := win.XInputGetState(user, &state)
+
+		fmt.println(state.Gamepad)
 
 		// Normaize input -- not what I want, I want dominate axis check
 		// lx := cast(f16)state.Gamepad.sThumbLX
@@ -298,6 +302,19 @@ main :: proc() {
 				controller.left_thumb_right.pressed = false
 				send_input(key = controller.left_thumb_right.key, key_state = .RELEASED)
 		 }
+		}
+
+		
+		if win.XINPUT_GAMEPAD_BUTTON_BIT.LEFT_THUMB in state.Gamepad.wButtons {
+			if !controller.left_thumb_click.pressed {
+				controller.left_thumb_click.pressed = true
+				send_input(controller.left_thumb_click.key, .PRESSED)
+			}
+		} else {
+			if controller.left_thumb_click.pressed {
+				controller.left_thumb_click.pressed = false
+				send_input(controller.left_thumb_click.key, .RELEASED)
+			}
 		}
 
 		// ============================================================================================================
