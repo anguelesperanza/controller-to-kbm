@@ -27,6 +27,7 @@ scroll_index:int = 0
 // ingame mouse speed set to 0.3 for left/right + top/down
 
 MOUSE_SPEED :: 0.5 // tweak to taste
+RIGHT_MOUSE_SPEED :: 2.0
 
 Direction :: enum {
 	LEFT,
@@ -273,9 +274,6 @@ main :: proc() {
 		    }
 		}
 
-		// fmt.println("MAGNITUDE LEFT", magnitude_left, "NORMALIZED MAGNITUDE LEFT", normalized_magnitude_left, "LX", lx)
-		// fmt.println("Normalized LX ", normalized_lx, "Normalized LY", normalized_ly)
-		
 		if normalized_ly > 0 {
 			if !controller.left_thumb_up.pressed {
 				controller.left_thumb_up.pressed = true
@@ -335,46 +333,86 @@ main :: proc() {
 
 		// ============================================================================================================
 		
-		// RIGHT STICK → MOUSE MOVEMENT
-		rx := state.Gamepad.sThumbRX
-		ry := state.Gamepad.sThumbRY
+		// // RIGHT STICK → MOUSE MOVEMENT
+		// rx := state.Gamepad.sThumbRX
+		// ry := state.Gamepad.sThumbRY
 
-		// Normalize thumbstick values to [-1.0, 1.0]
-		normalized_x := f32(rx) / 32767.0
-		normalized_y := f32(ry) / 32767.0
+		// // Normalize thumbstick values to [-1.0, 1.0]
+		// normalized_x_right := f32(rx) / 32767.0
+		// normalized_y_right := f32(ry) / 32767.0
 
-		// Apply deadzone
-		deadzone_threshold := f32(XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE) / 32767.0
+		// // Apply deadzone
+		// deadzone_threshold_right := f32(XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE) / 32767.0
 
-		// Check if the magnitude is within deadzone
-		magnitude := math.sqrt(normalized_x*normalized_x + normalized_y*normalized_y)
+		// // Check if the magnitude is within deadzone
+		// magnitude := math.sqrt(normalized_x_right*normalized_x_right + normalized_y_right*normalized_y_right)
 
-		if magnitude < deadzone_threshold {
-		    // Inside deadzone, set to zero
-		    normalized_x = 0
-		    normalized_y = 0
-		} else {
-		    // Outside deadzone - scale the vector properly
-		    // This ensures smooth diagonal movement
-		    scale := (magnitude - deadzone_threshold) / (1.0 - deadzone_threshold)
-		    if scale < 0 {
-		        scale = 0
-		    }
+		// if magnitude < deadzone_threshold_right {
+		//     // Inside deadzone, set to zero
+		//     normalized_x_right = 0
+		//     normalized_y_right = 0
+		// } else {
+		//     // Outside deadzone - scale the vector properly
+		//     // This ensures smooth diagonal movement
+		//     scale := (magnitude - deadzone_threshold_right) / (1.0 - deadzone_threshold_right)
+		//     if scale < 0 {
+		//         scale = 0
+		//     }
     
-		    // Apply the scaling to maintain proper proportions
-		    normalized_x = normalized_x * scale
-		    normalized_y = normalized_y * scale
+		//     // Apply the scaling to maintain proper proportions
+		//     normalized_x_right = normalized_x_right * scale
+		//     normalized_y_right = normalized_y_right * scale
+		// }
+
+		// // Apply mouse sensitivity
+		// dx := normalized_x_right * MOUSE_SPEED
+		// dy := normalized_y_right * MOUSE_SPEED
+
+		// // Round to integer for mouse movement
+		// dx_rounded := i32(math.round(f64(dx)))
+		// dy_rounded := i32(math.round(f64(dy)))
+		
+		// // fmt.printf("RX: %d  RY: %d\n", state.Gamepad.sThumbRX, state.Gamepad.sThumbRY)
+		
+		// send_mouse_move(dx_rounded, -dy_rounded)
+
+		rx := cast(f32)state.Gamepad.sThumbRX
+		ry := cast(f32)state.Gamepad.sThumbRY
+
+		// if math.abs(cast(f64)rx) < XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE do rx = 0
+		// if math.abs(cast(f64)ry) < XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE do ry = 0
+
+
+
+		magnitude_right:f32 = math.sqrt(rx * rx + ry * ry)
+
+
+		if magnitude_right < XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE {
+			rx = 0
+			ry = 0
+			magnitude_right = 0
+		}
+		
+		nx:f32 = 0
+		ny:f32 = 0
+
+		
+		normalized_magnitude_right:f32 = 0
+		
+		if magnitude_right > 0 {
+			nx = rx / magnitude_right
+			ny = ry / magnitude_right
+
+			normalized_magnitude_right = magnitude_right / 32767.0
+
+			if normalized_magnitude_right > 1.0 do normalized_magnitude_right = 1.0
 		}
 
-		// Apply mouse sensitivity
-		dx := normalized_x * MOUSE_SPEED
-		dy := normalized_y * MOUSE_SPEED
+		dx:f32 = nx * normalized_magnitude_right * RIGHT_MOUSE_SPEED
+		dy:f32 = -ny * normalized_magnitude_right * RIGHT_MOUSE_SPEED
 
-		// Round to integer for mouse movement
-		dx_rounded := i32(math.round(f64(dx)))
-		dy_rounded := i32(math.round(f64(dy)))
-
-		send_mouse_move(dx_rounded, -dy_rounded)
+		send_mouse_move(cast(win.LONG)dx, cast(win.LONG)dy)
+		
 		
 		// DPAD CHECKS -- UP
 		if win.XINPUT_GAMEPAD_BUTTON_BIT.DPAD_UP in state.Gamepad.wButtons {
