@@ -19,7 +19,8 @@ import "core:math"
 import win "core:sys/windows"
 
 XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE :: 7849
-XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE :: 8689
+// XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE :: 8689
+XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE :: 0.06
 INPUT_GAMEPAD_TRIGGER_THRESHOLD :: 30
 
 scroll_index:int = 0
@@ -27,8 +28,20 @@ scroll_index:int = 0
 // ingame mouse speed set to 0.3 for left/right + top/down
 
 MOUSE_SPEED :: 0.5 // tweak to taste
-RIGHT_MOUSE_SPEED :: 2.0
+// RIGHT_MOUSE_SPEED :: 2.0
+SMOOTHING :: 0.18
+CURVE :: 1.0
+MAX_ACCEL :: 0.5
+ACCEL_BUILDUP :: 0.04
+YMULT :: 0.50
+DEFAULT_SENSETIVITY :: 5
 
+smooth_x:f32
+smooth_y:f32
+accel_buildup:f32
+base_sensitivity:f32
+
+  
 Direction :: enum {
 	LEFT,
 	RIGHT,
@@ -119,6 +132,9 @@ setup_defaults :: proc() {
 	// Start / Select
 	controller.start.key = win.VK_ESCAPE
 	controller.select.key = win.VK_M
+
+	// Sensetivity for moving the right jostick as mouse
+	base_sensitivity = DEFAULT_SENSETIVITY
 }
 
 get_scroll_index :: proc(direction:Direction) -> win.WORD {
@@ -376,43 +392,131 @@ main :: proc() {
 		
 		// send_mouse_move(dx_rounded, -dy_rounded)
 
-		rx := cast(f32)state.Gamepad.sThumbRX
-		ry := cast(f32)state.Gamepad.sThumbRY
+		// rx := cast(f32)state.Gamepad.sThumbRX
+		// ry := cast(f32)state.Gamepad.sThumbRY
 
 		// if math.abs(cast(f64)rx) < XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE do rx = 0
 		// if math.abs(cast(f64)ry) < XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE do ry = 0
 
+		// magnitude_right:f32 = math.sqrt(rx * rx + ry * ry)
 
 
-		magnitude_right:f32 = math.sqrt(rx * rx + ry * ry)
+		// if magnitude_right < XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE {
+		// 	rx = 0
+		// 	ry = 0
+		// 	magnitude_right = 0
+		// }
+		
+		// nx:f32 = 0
+		// ny:f32 = 0
+
+		
+		// normalized_magnitude_right:f32 = 0
+		
+		// if magnitude_right > 0 {
+		// 	nx = rx / magnitude_right
+		// 	ny = ry / magnitude_right
+
+		// 	normalized_magnitude_right = magnitude_right / 32767.0
+
+		// 	if normalized_magnitude_right > 1.0 do normalized_magnitude_right = 1.0
+		// }
+
+		// dx:f32 = nx * normalized_magnitude_right * RIGHT_MOUSE_SPEED
+		// dy:f32 = -ny * normalized_magnitude_right * RIGHT_MOUSE_SPEED
+
+		// send_mouse_move(cast(win.LONG)dx, cast(win.LONG)dy)
+
+		
+		
+		// rx := state.Gamepad.sThumbRX
+		// ry := state.Gamepad.sThumbRY
+
+		// // Normalize thumbstick values to [-1.0, 1.0]
+		// normalized_x_right := f32(rx) / 32767.0
+		// normalized_y_right := f32(ry) / 32767.0
+
+		// // Apply deadzone
+		// deadzone_threshold_right := f32(XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE) / 32767.0
+
+		// // Check if the magnitude is within deadzone
+		// magnitude := math.sqrt(normalized_x_right*normalized_x_right + normalized_y_right*normalized_y_right)
+
+		// if magnitude < deadzone_threshold_right {
+		//     // Inside deadzone, set to zero
+		//     normalized_x_right = 0
+		//     normalized_y_right = 0
+		// } else {
+		//     // Outside deadzone - scale the vector properly
+		//     // This ensures smooth diagonal movement
+		//     scale := (magnitude - deadzone_threshold_right) / (1.0 - deadzone_threshold_right)
+		//     if scale < 0 {
+		//         scale = 0
+		//     }
+    
+		//     // Apply the scaling to maintain proper proportions
+		//     normalized_x_right = normalized_x_right * scale
+		//     normalized_y_right = normalized_y_right * scale
+		// }
+
+		// // Apply mouse sensitivity
+		// dx := normalized_x_right * MOUSE_SPEED
+		// dy := normalized_y_right * MOUSE_SPEED
+
+		// // Round to integer for mouse movement
+		// dx_rounded := i32(math.round(f64(dx)))
+		// dy_rounded := i32(math.round(f64(dy)))
+		
+		// // fmt.printf("RX: %d  RY: %d\n", state.Gamepad.sThumbRX, state.Gamepad.sThumbRY)
+		
+		// send_mouse_move(dx_rounded, -dy_rounded)
 
 
-		if magnitude_right < XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE {
-			rx = 0
-			ry = 0
-			magnitude_right = 0
+		/* The following is referenced from:https://github.com/TheLlamainator/Stick-Aim (lines 251 - 282) but adapted to use in
+		both Odin, and not pygame*/
+
+		rx:i16 = state.Gamepad.sThumbRX
+		ry:i16 = state.Gamepad.sThumbRY
+
+		normalized_x_right:f32 = cast(f32)(rx) / 32767.0
+		normalized_y_right:f32 = cast(f32)(ry) / 32767.0
+
+		 if abs(normalized_x_right) < XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE do normalized_x_right = 0 
+		 if abs(normalized_y_right) < XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE do normalized_y_right = 0 
+		
+		target_x:f32
+		target_y:f32
+
+		if normalized_x_right == 0 {
+			target_x = 0
+		 }else {
+			target_x = math.copy_sign_f32(math.pow_f32(cast(f32)abs(normalized_x_right), CURVE) ,normalized_x_right)
+		 }
+		if normalized_y_right == 0 {
+			target_y = 0
+		 }else {
+			target_y = math.copy_sign_f32(math.pow_f32(cast(f32)abs(normalized_y_right), CURVE) ,normalized_y_right)
+		 }
+
+		smooth_x += (target_x - smooth_x) * SMOOTHING
+		smooth_y += (target_y - smooth_y) * SMOOTHING
+		 
+		
+		magnitude_right := math.sqrt(smooth_x * smooth_x + smooth_y * smooth_y)
+
+		fmt.println(smooth_x)
+
+		if magnitude_right > 0.1 {
+			accel_buildup = min(MAX_ACCEL, accel_buildup + ACCEL_BUILDUP)
+		} else {
+			accel_buildup = max(1.0, accel_buildup - ACCEL_BUILDUP * 2)
 		}
-		
-		nx:f32 = 0
-		ny:f32 = 0
 
-		
-		normalized_magnitude_right:f32 = 0
-		
-		if magnitude_right > 0 {
-			nx = rx / magnitude_right
-			ny = ry / magnitude_right
+		dx:i32= i32(smooth_x * base_sensitivity * accel_buildup)
+		dy:i32 = i32(smooth_y * base_sensitivity * YMULT *  accel_buildup)
 
-			normalized_magnitude_right = magnitude_right / 32767.0
-
-			if normalized_magnitude_right > 1.0 do normalized_magnitude_right = 1.0
-		}
-
-		dx:f32 = nx * normalized_magnitude_right * RIGHT_MOUSE_SPEED
-		dy:f32 = -ny * normalized_magnitude_right * RIGHT_MOUSE_SPEED
-
-		send_mouse_move(cast(win.LONG)dx, cast(win.LONG)dy)
-		
+		// -dy so up on thumstick move mouse up and down moves down
+		send_mouse_move(dx = dx, dy = -dy)
 		
 		// DPAD CHECKS -- UP
 		if win.XINPUT_GAMEPAD_BUTTON_BIT.DPAD_UP in state.Gamepad.wButtons {
