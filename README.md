@@ -1,16 +1,26 @@
-### Controller to MKB
+### Controller input to Mouse and Keyboard Input
 
-Converts controller input to mouse and keyboard input
+This application is meant to run in the background. It converts controller input to mouse and keyboard input.
+Currenlty the buttons to KBM are hard coded. There are plans to work on a config file / config system of sorts
+so the program can read in a file and set the key mappings that way. But as this is still very early in development
+nothing has started on that yet.
 
 ## Supported Operating systems
 | OS      | Description                                 |
 | ------- | ------------------------------------------- |
 | Windows | Requires send_input() function in Win32 API |
 
+
+## Why no other operating systems.
+MacOS: Don't own a Mac
+
+Linux/Unix: It would be complicated to handle input across Wayland and Xlib (at least) as I do swap between the two every so often.
+
 ## Tested Games
-| Name   | Settings                                               |
-| -------| -------------------------------------------------------|
-| Hytale | Mouse Movement in game settings: 0.3, sprint on toggle.
+| Name         | Settings                                                   |
+| ------------ | ---------------------------------------------------------- |
+| Hytale       | Mouse Movement in game settings: 0.3, sprint on toggle.    |
+| Menace (Demo)| Super Quick Testing (as I don't know how to play the game) |
 
 ## Version History
 
@@ -22,10 +32,11 @@ Converts controller input to mouse and keyboard input
 
 Status: Done, WIP (Work In Progress), NSY (Not Started Yet)
 
-Status | Version     | Description                           |
-|------|-------------|---------------------------------------|
-| Done | 0.0.1-alpha | First release. Usable, but rough      |
-| WIP  | 0.0.2-alhpa | Refined input movement                |
+Status | Version       | Description                                                               |
+|------|---------------|---------------------------------------------------------------------------|
+| Done | 0.0.1-alpha   | First release. Usable, but rough                                          |
+| WIP  | 0.0.2-alhpa   | Refined Joystick movement                                                 |
+| NSY  | 1.0.0-release | Final Version (except for bug fixes). Has all features, all  suppored OS  | 
 
 ## Controlls
 
@@ -66,4 +77,6 @@ Sudden lag spikes
 
 ## Features in the works (WIP stuff):
 Circular Movement for both thumsticks as right now, both thumbsticks move in a very square like pattern.
+
+## Planned Features
 Way to load different controller to kbm mappings based on active window.
