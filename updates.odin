@@ -9,6 +9,7 @@ package main
 	Thumbstick and Deadzone: https://learn.microsoft.com/en-us/windows/win32/xinput/getting-started-with-xinput
 */
 
+import "core:fmt"
 import "core:math"
 import win "core:sys/windows"
 
@@ -105,22 +106,22 @@ setup_defaults :: proc() {
 	config.sensitivity = 8.0
 }
 
-get_scroll_index :: proc(direction: Direction) -> win.WORD {
-	switch direction {
-	case .LEFT:
-		scroll_index -= 1
-		if scroll_index < 1 do scroll_index = 9
-	case .RIGHT:
-		scroll_index += 1
-		if scroll_index > 9 do scroll_index = 1
-	}
+// get_scroll_index :: proc(direction: Direction) -> win.WORD {
+// 	switch direction {
+// 	case .LEFT:
+// 		scroll_index -= 1
+// 		if scroll_index < 1 do scroll_index = 9
+// 	case .RIGHT:
+// 		scroll_index += 1
+// 		if scroll_index > 9 do scroll_index = 1
+// 	}
 
-	keys := [10]win.WORD{
-		win.VK_0, win.VK_1, win.VK_2, win.VK_3, win.VK_4,
-		win.VK_5, win.VK_6, win.VK_7, win.VK_8, win.VK_9,
-	}
-	return keys[scroll_index]
-}
+// 	keys := [10]win.WORD{
+//  		win.VK_0, win.VK_1, win.VK_2, win.VK_3, win.VK_4,
+// 		win.VK_5, win.VK_6, win.VK_7, win.VK_8, win.VK_9,
+// 	}
+// 	return keys[scroll_index]
+// }
 
 send_mouse_input :: proc(event: win.DWORD) {
 	inputs: [1]win.INPUT
@@ -152,8 +153,8 @@ send_mouse_move :: proc(dx: i32, dy: i32) {
 main :: proc() {
 	setup_defaults()
 
-	// load_config("./config/hytale.ini")
-	config := load_default_config()
+	config := load_config("./config/nal.ini")
+	// config := load_default_config()
 
 	for {
 		user  : win.XUSER
@@ -400,4 +401,6 @@ main :: proc() {
 			send_input(config.controller.select.key, .RELEASED)
 		}
 	}
+
+	fmt.println("Finished running")
 }
