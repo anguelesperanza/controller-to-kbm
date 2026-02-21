@@ -26,7 +26,7 @@ Linux/Unix: It would be complicated to handle input across Wayland and Xlib (at 
 
 `Current version` 0.0.1-alpha
 
-`WIP Version` 0.0.2-alpha
+`WIP Version` 0.0.3-alpha
 
 `Goal Version` 1.0.0-release
 
@@ -35,7 +35,8 @@ Status: Done, WIP (Work In Progress), NSY (Not Started Yet)
 Status | Version       | Description                                                               |
 |------|---------------|---------------------------------------------------------------------------|
 | Done | 0.0.1-alpha   | First release. Usable, but rough                                          |
-| WIP  | 0.0.2-alpha   | Refined Joystick movement                                                 |
+| Done | 0.0.2-alpha   | Refined Joystick movement                                                 |
+| WIP  | 0.0.3-alpha   | Keymapping configs to change controller mappings on a per game basis      |
 | NSY  | -----------   | Whatever number of versions that come before 1.0.0-release                |
 | NSY  | 1.0.0-release | Final Version (except for bug fixes). Has all features, all  suppored OS  | 
 

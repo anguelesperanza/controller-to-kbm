@@ -20,7 +20,7 @@ CURVE               :: 1.0
 MAX_ACCEL           :: 0.5
 ACCEL_BUILDUP       :: 0.04
 YMULT               :: 0.85
-DEFAULT_SENSITIVITY :: 0.2  // raised from 5 — low values cause i32 truncation to produce a grid
+DEFAULT_SENSITIVITY :: 2.0 // Too low of a value will truncate and cause square-like movement
 
 smooth_x         : f32
 smooth_y         : f32
@@ -170,21 +170,14 @@ main :: proc() {
 		lx := cast(f16)state.Gamepad.sThumbLX
 		ly := cast(f16)state.Gamepad.sThumbLY
 
-		normalized_lx: f16
-		normalized_ly: f16
+		normalized_lx: f16 = 0
+		normalized_ly: f16 = 0
 
-		if math.abs(lx) < XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE &&
-		   math.abs(ly) < XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE {
-			normalized_lx = 0
-			normalized_ly = 0
-		} else {
-			if math.abs(lx) > math.abs(ly) {
-				normalized_lx = lx > 0 ? 1 : -1
-				normalized_ly = 0
-			} else {
-				normalized_ly = ly > 0 ? 1 : -1
-				normalized_lx = 0
-			}
+		if math.abs(lx) > XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE {
+		    normalized_lx = lx > 0 ? 1 : -1
+		}
+		if math.abs(ly) > XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE {
+		    normalized_ly = ly > 0 ? 1 : -1
 		}
 
 		// up
