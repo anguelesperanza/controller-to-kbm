@@ -5,6 +5,16 @@ Currenlty the buttons to KBM are hard coded. There are plans to work on a config
 so the program can read in a file and set the key mappings that way. But as this is still very early in development
 nothing has started on that yet.
 
+
+
+# Versions
+`Current version` 0.0.2-alpha
+
+`WIP Version` 0.0.3-alpha
+
+`Goal Version` 1.0.0-release
+
+
 ## Supported Operating systems
 | OS      | Description                                 |
 | ------- | ------------------------------------------- |
@@ -17,18 +27,21 @@ MacOS: Don't own a Mac
 Linux/Unix: It would be complicated to handle input across Wayland and Xlib (at least) as I do swap between the two every so often.
 
 ## Tested Games
-| Name         | Settings                                                   |
-| ------------ | ---------------------------------------------------------- |
-| Hytale       | Mouse Movement in game settings: 0.3, sprint on toggle.    |
-| Menace (Demo)| Super Quick Testing (as I don't know how to play the game) |
+| Name         | Settings                                                                            |
+| ------------ | ----------------------------------------------------------------------------------- |
+| Hytale       | Works but in-game settings may need to be tweaked                                   |
+| Menace (Demo)| Super Quick Testing (as I don't know how to play the game)                          |
+| New Arc Line | Need v0.0.3-alpha to be finished as current controls don't map to New Arc Line well | 
+
+
+
+## WIP Version Goal:
+
+`v0.0.3-alpha` will focues on creating a config based system to allow users to edit the keybindings.
+
+There is still quite a bit of figuring out to do for this so nothing is promised yet until more of this has been figured out.
 
 ## Version History
-
-`Current version` 0.0.1-alpha
-
-`WIP Version` 0.0.3-alpha
-
-`Goal Version` 1.0.0-release
 
 Status: Done, WIP (Work In Progress), NSY (Not Started Yet)
 
@@ -64,21 +77,13 @@ Status | Version       | Description                                            
 
 ## Known Issues:
 Sudden lag spikes
-  Probably caused by calling the send_input() function for win32 like crazy. Need to test on more games first to be sure.
-  
-  Need to look into way to reduce call count if possible.
+  Probably caused by calling the send_input() function for win32 like crazy. Need to test on more games first to be sure. Need to look into way to reduce call count if possible.
 
-  Right thumb stick mouse movement too high depending on wether in game or in menu
-  
-  Currenlty, mouse speed in code is set to 0.5, anything lower than that (0.4 onward) the mouse does not move.
-  Anything higher, then the mouse zooms all over the place.
-  This mouse speed is **not** the the same as mouse sentivity set by the OS.
-  
-  The mouse gives for more precise control than a thumbstick can, so some difference in speed/sensitivy is expected. But not
-  as drastic as it currenlty is. The mouse feel is being compared to how it feels on the ROG Ally using the Desktop control mode.
+The mouse gives for more precise control than a thumbstick can, so some difference in speed/sensitivy is expected. But not
+as drastic as it currenlty is. The mouse feel is being compared to how it feels on the ROG Ally using the Desktop control mode.
 
 ## Features in the works (WIP stuff):
-Circular Movement for both thumsticks as right now, both thumbsticks move in a very square like pattern.
+Creating config based system to load different mapping values.
 
 ## Planned Features
 Way to load different controller to kbm mappings based on active window.
