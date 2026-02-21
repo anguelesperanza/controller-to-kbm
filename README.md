@@ -35,7 +35,8 @@ Status: Done, WIP (Work In Progress), NSY (Not Started Yet)
 Status | Version       | Description                                                               |
 |------|---------------|---------------------------------------------------------------------------|
 | Done | 0.0.1-alpha   | First release. Usable, but rough                                          |
-| WIP  | 0.0.2-alhpa   | Refined Joystick movement                                                 |
+| WIP  | 0.0.2-alpha   | Refined Joystick movement                                                 |
+| NSY  | -----------   | Whatever number of versions that come before 1.0.0-release                |
 | NSY  | 1.0.0-release | Final Version (except for bug fixes). Has all features, all  suppored OS  | 
 
 ## Controlls
