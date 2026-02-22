@@ -1,4 +1,3 @@
-
 package main
 
 /*
@@ -110,7 +109,8 @@ handle_button :: proc(button: ^Button, is_pressed: bool) {
 
 main :: proc() {
 	// config := load_config("./config/hytale.ini")
-	config := load_config("./config/nal.ini")
+	// config := load_config("./config/nal.ini")
+	config := load_config("./config/demonologist.ini")
 	// config := load_default_config()
 
 	for {
