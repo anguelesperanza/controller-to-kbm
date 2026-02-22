@@ -32,7 +32,6 @@ remainder_y : f32
 
 scroll_index : int = 0
 
-
 Direction :: enum {
 	LEFT,
 	RIGHT,

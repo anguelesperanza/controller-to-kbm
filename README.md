@@ -25,6 +25,7 @@ nothing has started on that yet.
 MacOS: Don't own a Mac
 
 Linux/Unix: It would be complicated to handle input across Wayland and Xlib (at least) as I do swap between the two every so often.
+Upon finishing the windows version, but before v1.0.0-release, I want to look into this and see how doable it is.
 
 ## Tested Games
 | Name         | Settings                                                                            |
@@ -40,6 +41,13 @@ Linux/Unix: It would be complicated to handle input across Wayland and Xlib (at 
 `v0.0.3-alpha` will focues on creating a config based system to allow users to edit the keybindings.
 
 There is still quite a bit of figuring out to do for this so nothing is promised yet until more of this has been figured out.
+
+The rough idea is:
+
+- Config files on a per game basis
+- Swapping config files based on active windows (maybe)
+- Implementing the remaining controller buttons (right thumbstick press (R3), Triggers)
+
 
 ## Version History
 
