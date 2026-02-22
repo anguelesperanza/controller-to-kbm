@@ -12,21 +12,23 @@ package main
 
 	The following are the keywords used in the .ini
 	===============================================
-	A-Z:          Maps to the corresponding VK (must be uppercase)
-	0-9:          Maps to the corresponding VK
-	TAB           -> VK_TAB
-	SPACE         -> VK_SPACE
-	LSHIFT        -> VK_LSHIFT
-	LCONTROL      -> VK_LCONTROL
-	LALT          -> VK_LMENU
-	RALT          -> VK_RMENU
-	ESCAPE        -> VK_ESCAPE
-	left_click    -> Left mouse button
-	right_click   -> Right mouse button
-	scroll_up     -> Scroll wheel up
-	scroll_down   -> Scroll wheel down
-	num_up        -> Increment scroll index (number row)
-	num_down      -> Decrement scroll index (number row)
+	A-Z:               Maps to the corresponding VK (must be uppercase)
+	0-9:               Maps to the corresponding VK
+	TAB                -> VK_TAB
+	SPACE              -> VK_SPACE
+	LSHIFT             -> VK_LSHIFT
+	LCONTROL           -> VK_LCONTROL
+	LALT               -> VK_LMENU
+	RALT               -> VK_RMENU
+	ESCAPE             -> VK_ESCAPE
+	left_click         -> Left mouse button
+	right_click        -> Right mouse button
+	scroll_up          -> Scroll wheel up
+	scroll_down        -> Scroll wheel down
+	num_up             -> Increment scroll index (number row)
+	num_down           -> Decrement scroll index (number row)
+
+	scroll_repeat_rate -> Milliseconds between scroll wheel events when held (default: 100)
 */
 
 import "core:fmt"
@@ -87,17 +89,18 @@ Controller :: struct {
 }
 
 Config :: struct {
-	controller:        Controller,
-	smoothing:         f32,
-	curve:             f32,
-	max_accel:         f32,
-	accel_buildup:     f32,
-	ymult:             f32,
-	sensitivity:       f32,
-	pause_sensitivity: f32,
-	left_deadzone:     f64,
-	right_deadzone:    f64,
-	trigger_threshold: u8,   // 0-255, how far the trigger must be pressed to register
+	controller:         Controller,
+	smoothing:          f32,
+	curve:              f32,
+	max_accel:          f32,
+	accel_buildup:      f32,
+	ymult:              f32,
+	sensitivity:        f32,
+	pause_sensitivity:  f32,
+	left_deadzone:      f64,
+	right_deadzone:     f64,
+	trigger_threshold:  u8,  // 0-255, how far the trigger must be pressed to register
+	scroll_repeat_rate: int, // milliseconds between scroll wheel events when held
 }
 
 
@@ -207,16 +210,17 @@ load_default_config :: proc() -> Config {
 	config.controller.select.type = .KEY
 	config.controller.select.key  = win.VK_M
 
-	config.smoothing         = 0.18
-	config.curve             = 1.0
-	config.max_accel         = 0.5
-	config.accel_buildup     = 0.04
-	config.ymult             = 0.85
-	config.sensitivity       = 2.0
-	config.pause_sensitivity = 0.05
-	config.left_deadzone     = 7849.0
-	config.right_deadzone    = 0.06
-	config.trigger_threshold = 30
+	config.smoothing          = 0.18
+	config.curve              = 1.0
+	config.max_accel          = 0.5
+	config.accel_buildup      = 0.04
+	config.ymult              = 0.85
+	config.sensitivity        = 2.0
+	config.pause_sensitivity  = 0.05
+	config.left_deadzone      = 7849.0
+	config.right_deadzone     = 0.06
+	config.trigger_threshold  = 30
+	config.scroll_repeat_rate = 100
 
 	return config
 }
@@ -250,8 +254,11 @@ load_config :: proc(path: string) -> Config {
 	config.left_deadzone,     _ = strconv.parse_f64(m["settings"]["left_deadzone"])
 	config.right_deadzone,    _ = strconv.parse_f64(m["settings"]["right_deadzone"])
 
-	threshold_int, ok := strconv.parse_int(m["settings"]["trigger_threshold"])
-	config.trigger_threshold = ok ? u8(threshold_int) : 30
+	threshold_int, threshold_ok := strconv.parse_int(m["settings"]["trigger_threshold"])
+	config.trigger_threshold = threshold_ok ? u8(threshold_int) : 30
+
+	scroll_rate, scroll_ok := strconv.parse_int(m["settings"]["scroll_repeat_rate"])
+	config.scroll_repeat_rate = scroll_ok ? scroll_rate : 100
 
 	// Face buttons
 	config.controller.face_up    = config_to_button(m["buttons"]["face_up"])

@@ -1,4 +1,3 @@
-
 package main
 
 /*
@@ -11,6 +10,7 @@ package main
 */
 
 import "core:math"
+import "core:time"
 import win "core:sys/windows"
 
 smooth_x    : f32
@@ -18,7 +18,8 @@ smooth_y    : f32
 remainder_x : f32
 remainder_y : f32
 
-scroll_index : int = 0
+scroll_index     : int = 0
+scroll_last_tick : time.Tick
 
 WHEEL_DELTA :: 120  // Standard Windows scroll wheel delta
 
@@ -60,8 +61,8 @@ send_mouse_input :: proc(event: win.DWORD) {
 
 send_input :: proc(key: win.WORD, key_state: State) {
 	inputs: [1]win.INPUT
-	inputs[0].type     = .KEYBOARD
-	inputs[0].ki.wScan = cast(u16)win.MapVirtualKeyW(cast(win.UINT)key, 0)
+	inputs[0].type       = .KEYBOARD
+	inputs[0].ki.wScan   = cast(u16)win.MapVirtualKeyW(cast(win.UINT)key, 0)
 	inputs[0].ki.dwFlags = 0x0008 // KEYEVENTF_SCANCODE
 	if key_state == .RELEASED {
 		inputs[0].ki.dwFlags |= 0x0002 // KEYEVENTF_KEYUP
@@ -80,34 +81,45 @@ send_mouse_move :: proc(dx: i32, dy: i32) {
 }
 
 send_wheel :: proc(direction: i32) {
-	// direction: positive = scroll up, negative = scroll down
 	inputs: [1]win.INPUT
-	inputs[0]               = win.INPUT{}
-	inputs[0].type          = .MOUSE
-	inputs[0].mi.mouseData  = cast(win.DWORD)(direction * WHEEL_DELTA)
-	inputs[0].mi.dwFlags    = win.MOUSEEVENTF_WHEEL
+	inputs[0]              = win.INPUT{}
+	inputs[0].type         = .MOUSE
+	inputs[0].mi.mouseData = cast(win.DWORD)(direction * WHEEL_DELTA)
+	inputs[0].mi.dwFlags   = win.MOUSEEVENTF_WHEEL
 	win.SendInput(len(inputs), raw_data(inputs[:]), size_of(win.INPUT))
 }
 
-handle_button :: proc(button: ^Button, is_pressed: bool) {
+handle_button :: proc(button: ^Button, is_pressed: bool, scroll_ready: bool, scroll_last_tick: ^time.Tick) {
 	if is_pressed {
-		if !button.pressed {
-			button.pressed = true
-			switch button.type {
-			case .KEY:
-				send_input(button.key, .PRESSED)
-			case .MOUSE_BUTTON:
-				send_mouse_input(button.mouse_button)
-			case .SCROLL_UP:
-				button.key = get_scroll_index(.RIGHT)
-				send_input(button.key, .PRESSED)
-			case .SCROLL_DOWN:
-				button.key = get_scroll_index(.LEFT)
-				send_input(button.key, .PRESSED)
-			case .WHEEL_UP:
+		#partial switch button.type {
+		case .WHEEL_UP:
+			if !button.pressed || scroll_ready {
 				send_wheel(1)
-			case .WHEEL_DOWN:
+				scroll_last_tick^ = time.tick_now()
+			}
+			button.pressed = true
+		case .WHEEL_DOWN:
+			if !button.pressed || scroll_ready {
 				send_wheel(-1)
+				scroll_last_tick^ = time.tick_now()
+			}
+			button.pressed = true
+		case:
+			if !button.pressed {
+				button.pressed = true
+				switch button.type {
+				case .KEY:
+					send_input(button.key, .PRESSED)
+				case .MOUSE_BUTTON:
+					send_mouse_input(button.mouse_button)
+				case .SCROLL_UP:
+					button.key = get_scroll_index(.RIGHT)
+					send_input(button.key, .PRESSED)
+				case .SCROLL_DOWN:
+					button.key = get_scroll_index(.LEFT)
+					send_input(button.key, .PRESSED)
+				case .WHEEL_UP, .WHEEL_DOWN:
+				}
 			}
 		}
 	} else {
@@ -121,7 +133,8 @@ handle_button :: proc(button: ^Button, is_pressed: bool) {
 			case .SCROLL_UP, .SCROLL_DOWN:
 				send_input(button.key, .RELEASED)
 			case .WHEEL_UP, .WHEEL_DOWN:
-				// Scroll wheel has no release event
+				// No release event needed, reset tick so next press fires immediately
+				scroll_last_tick^ = {}
 			}
 		}
 	}
@@ -135,6 +148,9 @@ main :: proc() {
 		user  : win.XUSER
 		state : win.XINPUT_STATE
 		win.XInputGetState(user, &state)
+
+		// Check if enough time has passed to allow the next scroll event
+		scroll_ready := time.tick_diff(scroll_last_tick, time.tick_now()) >= time.Duration(config.scroll_repeat_rate) * time.Millisecond
 
 		// ── Left stick → WASD ────────────────────────────────────────────────
 
@@ -151,11 +167,11 @@ main :: proc() {
 			normalized_ly = ly > 0 ? 1 : -1
 		}
 
-		handle_button(&config.controller.left_thumb_up,    normalized_ly > 0)
-		handle_button(&config.controller.left_thumb_down,  normalized_ly < 0)
-		handle_button(&config.controller.left_thumb_left,  normalized_lx < 0)
-		handle_button(&config.controller.left_thumb_right, normalized_lx > 0)
-		handle_button(&config.controller.left_thumb_click, .LEFT_THUMB in state.Gamepad.wButtons)
+		handle_button(&config.controller.left_thumb_up,    normalized_ly > 0,                             scroll_ready, &scroll_last_tick)
+		handle_button(&config.controller.left_thumb_down,  normalized_ly < 0,                             scroll_ready, &scroll_last_tick)
+		handle_button(&config.controller.left_thumb_left,  normalized_lx < 0,                             scroll_ready, &scroll_last_tick)
+		handle_button(&config.controller.left_thumb_right, normalized_lx > 0,                             scroll_ready, &scroll_last_tick)
+		handle_button(&config.controller.left_thumb_click, .LEFT_THUMB in state.Gamepad.wButtons,         scroll_ready, &scroll_last_tick)
 
 		// ── Right stick → mouse movement (radial deadzone) ───────────────────
 
@@ -200,31 +216,36 @@ main :: proc() {
 
 		// ── Triggers ──────────────────────────────────────────────────────────
 
-		handle_button(&config.controller.left_trigger,  cast(byte)state.Gamepad.bLeftTrigger  > config.trigger_threshold)
-		handle_button(&config.controller.right_trigger, cast(byte)state.Gamepad.bRightTrigger > config.trigger_threshold)
+		handle_button(&config.controller.left_trigger,  cast(byte)state.Gamepad.bLeftTrigger  > config.trigger_threshold, scroll_ready, &scroll_last_tick)
+		handle_button(&config.controller.right_trigger, cast(byte)state.Gamepad.bRightTrigger > config.trigger_threshold, scroll_ready, &scroll_last_tick)
 
 		// ── D-pad ─────────────────────────────────────────────────────────────
 
-		handle_button(&config.controller.dpad_up,    .DPAD_UP    in state.Gamepad.wButtons)
-		handle_button(&config.controller.dpad_down,  .DPAD_DOWN  in state.Gamepad.wButtons)
-		handle_button(&config.controller.dpad_left,  .DPAD_LEFT  in state.Gamepad.wButtons)
-		handle_button(&config.controller.dpad_right, .DPAD_RIGHT in state.Gamepad.wButtons)
+		handle_button(&config.controller.dpad_up,    .DPAD_UP    in state.Gamepad.wButtons, scroll_ready, &scroll_last_tick)
+		handle_button(&config.controller.dpad_down,  .DPAD_DOWN  in state.Gamepad.wButtons, scroll_ready, &scroll_last_tick)
+		handle_button(&config.controller.dpad_left,  .DPAD_LEFT  in state.Gamepad.wButtons, scroll_ready, &scroll_last_tick)
+		handle_button(&config.controller.dpad_right, .DPAD_RIGHT in state.Gamepad.wButtons, scroll_ready, &scroll_last_tick)
 
 		// ── Face buttons ──────────────────────────────────────────────────────
 
-		handle_button(&config.controller.face_up,    .Y in state.Gamepad.wButtons)
-		handle_button(&config.controller.face_down,  .A in state.Gamepad.wButtons)
-		handle_button(&config.controller.face_left,  .X in state.Gamepad.wButtons)
-		handle_button(&config.controller.face_right, .B in state.Gamepad.wButtons)
+		handle_button(&config.controller.face_up,    .Y in state.Gamepad.wButtons, scroll_ready, &scroll_last_tick)
+		handle_button(&config.controller.face_down,  .A in state.Gamepad.wButtons, scroll_ready, &scroll_last_tick)
+		handle_button(&config.controller.face_left,  .X in state.Gamepad.wButtons, scroll_ready, &scroll_last_tick)
+		handle_button(&config.controller.face_right, .B in state.Gamepad.wButtons, scroll_ready, &scroll_last_tick)
 
 		// ── Bumpers ───────────────────────────────────────────────────────────
 
-		handle_button(&config.controller.left_bumper,  .LEFT_SHOULDER  in state.Gamepad.wButtons)
-		handle_button(&config.controller.right_bumper, .RIGHT_SHOULDER in state.Gamepad.wButtons)
+		handle_button(&config.controller.left_bumper,  .LEFT_SHOULDER  in state.Gamepad.wButtons, scroll_ready, &scroll_last_tick)
+		handle_button(&config.controller.right_bumper, .RIGHT_SHOULDER in state.Gamepad.wButtons, scroll_ready, &scroll_last_tick)
 
 		// ── Start / Select ────────────────────────────────────────────────────
 
-		handle_button(&config.controller.start,  .START in state.Gamepad.wButtons)
-		handle_button(&config.controller.select, .BACK  in state.Gamepad.wButtons)
+		handle_button(&config.controller.start,  .START in state.Gamepad.wButtons, scroll_ready, &scroll_last_tick)
+		handle_button(&config.controller.select, .BACK  in state.Gamepad.wButtons, scroll_ready, &scroll_last_tick)
+
+		// Sleep when the right stick is idle to avoid busy-looping
+		if magnitude_right <= cast(f32)config.right_deadzone {
+			time.sleep(8 * time.Millisecond)
+		}
 	}
 }

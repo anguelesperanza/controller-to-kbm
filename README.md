@@ -30,9 +30,12 @@ Upon finishing the windows version, but before v1.0.0-release, I want to look in
 ## Tested Games
 | Name         | Settings                                                                            |
 | ------------ | ----------------------------------------------------------------------------------- |
-| Hytale       | Works but in-game settings may need to be tweaked                                   |
-| Menace (Demo)| Super Quick Testing (as I don't know how to play the game)                          |
-| New Arc Line | Need v0.0.3-alpha to be finished as current controls don't map to New Arc Line well | 
+| Hytale         | Works well. Ingame settings may need to be tweaked to liking                      |
+| Menace (Demo)  | Super Quick Testing (as I don't know how to play the game)                        |
+| New Arc Line   | Works well. No noticable perforamnce difference                                   | 
+| Demonologist   | Works well. No big performance lags, but there was some screen tearing            |
+| Relative Frame | Incorrect inputs are registering. Need to look into more to find out the reason   |
+| R.E.P.O        | Works fine. Passed the tutorial using controller                                  |
 
 
 
@@ -44,9 +47,9 @@ There is still quite a bit of figuring out to do for this so nothing is promised
 
 The rough idea is:
 
-- Config files on a per game basis
-- Swapping config files based on active windows (maybe)
-- Implementing the remaining controller buttons (right thumbstick press (R3), Triggers)
+- [x]Config files on a per game basis
+- [-]Swapping config files based on active windows (maybe)
+- [x]Implementing the remaining controller buttons (right thumbstick press (R3), Triggers)
 
 
 ## Version History
@@ -58,10 +61,14 @@ Status | Version       | Description                                            
 | Done | 0.0.1-alpha   | First release. Usable, but rough                                          |
 | Done | 0.0.2-alpha   | Refined Joystick movement                                                 |
 | WIP  | 0.0.3-alpha   | Keymapping configs to change controller mappings on a per game basis      |
+|      |               | Accidentely fixed lag issue (so far) with Hytle by reducing calls         |
 | NSY  | -----------   | Whatever number of versions that come before 1.0.0-release                |
 | NSY  | 1.0.0-release | Final Version (except for bug fixes). Has all features, all  suppored OS  | 
 
-## Controlls
+## Controls (Default)
+
+When no maped config file is provided, these are the default controls.
+(They were the original controls used when testing Hytale at the start of this tools development).
 
 | Input           | Direction   | Key / Action                                                                              |
 |-----------------|-------------|-------------------------------------------------------------------------------------------|
@@ -81,14 +88,6 @@ Status | Version       | Description                                            
 | Right stick     | Mouse Move  | Moves mouse                                                                               |
 | Start           | Pressed     | Escape                                                                                    |
 | select / back   | Pressed     | M                                                                                         |
-
-
-## Known Issues:
-Sudden lag spikes
-  Probably caused by calling the send_input() function for win32 like crazy. Need to test on more games first to be sure. Need to look into way to reduce call count if possible.
-
-The mouse gives for more precise control than a thumbstick can, so some difference in speed/sensitivy is expected. But not
-as drastic as it currenlty is. The mouse feel is being compared to how it feels on the ROG Ally using the Desktop control mode.
 
 ## Features in the works (WIP stuff):
 Creating config based system to load different mapping values.
