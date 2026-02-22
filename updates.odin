@@ -1,3 +1,4 @@
+
 package main
 
 /*
@@ -9,7 +10,6 @@ package main
 	Thumbstick and Deadzone: https://learn.microsoft.com/en-us/windows/win32/xinput/getting-started-with-xinput
 */
 
-import "core:fmt"
 import "core:math"
 import win "core:sys/windows"
 
@@ -19,6 +19,8 @@ remainder_x : f32
 remainder_y : f32
 
 scroll_index : int = 0
+
+WHEEL_DELTA :: 120  // Standard Windows scroll wheel delta
 
 
 Direction :: enum {
@@ -58,10 +60,11 @@ send_mouse_input :: proc(event: win.DWORD) {
 
 send_input :: proc(key: win.WORD, key_state: State) {
 	inputs: [1]win.INPUT
-	inputs[0].type   = .KEYBOARD
-	inputs[0].ki.wVk = key
+	inputs[0].type     = .KEYBOARD
+	inputs[0].ki.wScan = cast(u16)win.MapVirtualKeyW(cast(win.UINT)key, 0)
+	inputs[0].ki.dwFlags = 0x0008 // KEYEVENTF_SCANCODE
 	if key_state == .RELEASED {
-		inputs[0].ki.dwFlags = 0x0002
+		inputs[0].ki.dwFlags |= 0x0002 // KEYEVENTF_KEYUP
 	}
 	win.SendInput(len(inputs), raw_data(inputs[:]), size_of(win.INPUT))
 }
@@ -73,6 +76,16 @@ send_mouse_move :: proc(dx: i32, dy: i32) {
 	inputs[0].mi.dx      = dx
 	inputs[0].mi.dy      = dy
 	inputs[0].mi.dwFlags = win.MOUSEEVENTF_MOVE
+	win.SendInput(len(inputs), raw_data(inputs[:]), size_of(win.INPUT))
+}
+
+send_wheel :: proc(direction: i32) {
+	// direction: positive = scroll up, negative = scroll down
+	inputs: [1]win.INPUT
+	inputs[0]               = win.INPUT{}
+	inputs[0].type          = .MOUSE
+	inputs[0].mi.mouseData  = cast(win.DWORD)(direction * WHEEL_DELTA)
+	inputs[0].mi.dwFlags    = win.MOUSEEVENTF_WHEEL
 	win.SendInput(len(inputs), raw_data(inputs[:]), size_of(win.INPUT))
 }
 
@@ -91,6 +104,10 @@ handle_button :: proc(button: ^Button, is_pressed: bool) {
 			case .SCROLL_DOWN:
 				button.key = get_scroll_index(.LEFT)
 				send_input(button.key, .PRESSED)
+			case .WHEEL_UP:
+				send_wheel(1)
+			case .WHEEL_DOWN:
+				send_wheel(-1)
 			}
 		}
 	} else {
@@ -103,15 +120,15 @@ handle_button :: proc(button: ^Button, is_pressed: bool) {
 				send_mouse_input(button.mouse_release)
 			case .SCROLL_UP, .SCROLL_DOWN:
 				send_input(button.key, .RELEASED)
+			case .WHEEL_UP, .WHEEL_DOWN:
+				// Scroll wheel has no release event
 			}
 		}
 	}
 }
 
 main :: proc() {
-	// config := load_config("./config/hytale.ini")
-	config := load_config("./config/nal.ini")
-	// config := load_config("./config/demonologist.ini")
+	config := load_config("./config/hytale.ini")
 	// config := load_default_config()
 
 	for {
@@ -181,7 +198,10 @@ main :: proc() {
 
 		send_mouse_move(dx, -dy)
 
-		handle_button(&config.controller.right_thumb_click, .RIGHT_THUMB in state.Gamepad.wButtons)
+		// ── Triggers ──────────────────────────────────────────────────────────
+
+		handle_button(&config.controller.left_trigger,  cast(byte)state.Gamepad.bLeftTrigger  > config.trigger_threshold)
+		handle_button(&config.controller.right_trigger, cast(byte)state.Gamepad.bRightTrigger > config.trigger_threshold)
 
 		// ── D-pad ─────────────────────────────────────────────────────────────
 

@@ -1,3 +1,4 @@
+
 package main
 
 /*
@@ -11,19 +12,21 @@ package main
 
 	The following are the keywords used in the .ini
 	===============================================
-	A-Z:         Maps to the corresponding VK (must be uppercase)
-	0-9:         Maps to the corresponding VK
-	TAB          -> VK_TAB
-	SPACE        -> VK_SPACE
-	LSHIFT       -> VK_LSHIFT
-	LCONTROL     -> VK_LCONTROL
-	LALT         -> VK_LMENU
-	RALT         -> VK_RMENU
-	ESCAPE       -> VK_ESCAPE
-	left_click   -> Left mouse button
-	right_click  -> Right mouse button
-	num_up       -> Increment scroll index (number row)
-	num_down     -> Decrement scroll index (number row)
+	A-Z:          Maps to the corresponding VK (must be uppercase)
+	0-9:          Maps to the corresponding VK
+	TAB           -> VK_TAB
+	SPACE         -> VK_SPACE
+	LSHIFT        -> VK_LSHIFT
+	LCONTROL      -> VK_LCONTROL
+	LALT          -> VK_LMENU
+	RALT          -> VK_RMENU
+	ESCAPE        -> VK_ESCAPE
+	left_click    -> Left mouse button
+	right_click   -> Right mouse button
+	scroll_up     -> Scroll wheel up
+	scroll_down   -> Scroll wheel down
+	num_up        -> Increment scroll index (number row)
+	num_down      -> Decrement scroll index (number row)
 */
 
 import "core:fmt"
@@ -38,6 +41,8 @@ ButtonType :: enum {
 	MOUSE_BUTTON,
 	SCROLL_UP,
 	SCROLL_DOWN,
+	WHEEL_UP,
+	WHEEL_DOWN,
 }
 
 Button :: struct {
@@ -65,15 +70,16 @@ Controller :: struct {
 	left_bumper:  Button,
 	right_bumper: Button,
 
+	// triggers
+	left_trigger:  Button,
+	right_trigger: Button,
+
 	// left thumbstick
 	left_thumb_up:    Button,
 	left_thumb_down:  Button,
 	left_thumb_left:  Button,
 	left_thumb_right: Button,
 	left_thumb_click: Button,
-
-	// right thumbstick
-	right_thumb_click: Button,
 
 	// Start / Select
 	start:  Button,
@@ -91,6 +97,7 @@ Config :: struct {
 	pause_sensitivity: f32,
 	left_deadzone:     f64,
 	right_deadzone:    f64,
+	trigger_threshold: u8,   // 0-255, how far the trigger must be pressed to register
 }
 
 
@@ -123,11 +130,10 @@ config_to_button :: proc(value: string) -> Button {
 		button.type = .SCROLL_UP
 	case "num_down":
 		button.type = .SCROLL_DOWN
-	case "middle_mouse":
-		button.type = .MOUSE_BUTTON
-		button.mouse_button  = win.MOUSEEVENTF_MIDDLEDOWN
-		button.mouse_release  = win.MOUSEEVENTF_MIDDLEUP
-		
+	case "scroll_up":
+		button.type = .WHEEL_UP
+	case "scroll_down":
+		button.type = .WHEEL_DOWN
 	case "right_click":
 		button.type          = .MOUSE_BUTTON
 		button.mouse_button  = win.MOUSEEVENTF_RIGHTDOWN
@@ -137,7 +143,6 @@ config_to_button :: proc(value: string) -> Button {
 		button.mouse_button  = win.MOUSEEVENTF_LEFTDOWN
 		button.mouse_release = win.MOUSEEVENTF_LEFTUP
 	case:
-		// Single letter A-Z or digit 0-9
 		if len(value) == 1 {
 			c := value[0]
 			if (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') {
@@ -180,6 +185,10 @@ load_default_config :: proc() -> Config {
 	config.controller.right_bumper.mouse_button  = win.MOUSEEVENTF_LEFTDOWN
 	config.controller.right_bumper.mouse_release = win.MOUSEEVENTF_LEFTUP
 
+	// triggers (default to scroll wheel)
+	config.controller.left_trigger.type  = .WHEEL_DOWN
+	config.controller.right_trigger.type = .WHEEL_UP
+
 	// left thumbstick
 	config.controller.left_thumb_up.type    = .KEY
 	config.controller.left_thumb_up.key     = win.VK_W
@@ -207,6 +216,7 @@ load_default_config :: proc() -> Config {
 	config.pause_sensitivity = 0.05
 	config.left_deadzone     = 7849.0
 	config.right_deadzone    = 0.06
+	config.trigger_threshold = 30
 
 	return config
 }
@@ -240,6 +250,9 @@ load_config :: proc(path: string) -> Config {
 	config.left_deadzone,     _ = strconv.parse_f64(m["settings"]["left_deadzone"])
 	config.right_deadzone,    _ = strconv.parse_f64(m["settings"]["right_deadzone"])
 
+	threshold_int, ok := strconv.parse_int(m["settings"]["trigger_threshold"])
+	config.trigger_threshold = ok ? u8(threshold_int) : 30
+
 	// Face buttons
 	config.controller.face_up    = config_to_button(m["buttons"]["face_up"])
 	config.controller.face_down  = config_to_button(m["buttons"]["face_down"])
@@ -256,14 +269,16 @@ load_config :: proc(path: string) -> Config {
 	config.controller.left_bumper  = config_to_button(m["buttons"]["left_bumper"])
 	config.controller.right_bumper = config_to_button(m["buttons"]["right_bumper"])
 
+	// Triggers
+	config.controller.left_trigger  = config_to_button(m["buttons"]["left_trigger"])
+	config.controller.right_trigger = config_to_button(m["buttons"]["right_trigger"])
+
 	// Left thumbstick
 	config.controller.left_thumb_up    = config_to_button(m["buttons"]["left_thumb_up"])
 	config.controller.left_thumb_down  = config_to_button(m["buttons"]["left_thumb_down"])
 	config.controller.left_thumb_left  = config_to_button(m["buttons"]["left_thumb_left"])
 	config.controller.left_thumb_right = config_to_button(m["buttons"]["left_thumb_right"])
 	config.controller.left_thumb_click = config_to_button(m["buttons"]["left_thumb_click"])
-
-	config.controller.right_thumb_click = config_to_button(m["buttons"]["right_thumb_click"])
 
 	// Start / Select
 	config.controller.start  = config_to_button(m["buttons"]["start"])
