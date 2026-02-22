@@ -9,6 +9,7 @@ package main
 	Thumbstick and Deadzone: https://learn.microsoft.com/en-us/windows/win32/xinput/getting-started-with-xinput
 */
 
+import "core:fmt"
 import "core:math"
 import win "core:sys/windows"
 
@@ -109,8 +110,8 @@ handle_button :: proc(button: ^Button, is_pressed: bool) {
 
 main :: proc() {
 	// config := load_config("./config/hytale.ini")
-	// config := load_config("./config/nal.ini")
-	config := load_config("./config/demonologist.ini")
+	config := load_config("./config/nal.ini")
+	// config := load_config("./config/demonologist.ini")
 	// config := load_default_config()
 
 	for {
@@ -179,6 +180,8 @@ main :: proc() {
 		remainder_y -= f32(dy)
 
 		send_mouse_move(dx, -dy)
+
+		handle_button(&config.controller.right_thumb_click, .RIGHT_THUMB in state.Gamepad.wButtons)
 
 		// ── D-pad ─────────────────────────────────────────────────────────────
 

@@ -72,6 +72,9 @@ Controller :: struct {
 	left_thumb_right: Button,
 	left_thumb_click: Button,
 
+	// right thumbstick
+	right_thumb_click: Button,
+
 	// Start / Select
 	start:  Button,
 	select: Button,
@@ -120,6 +123,11 @@ config_to_button :: proc(value: string) -> Button {
 		button.type = .SCROLL_UP
 	case "num_down":
 		button.type = .SCROLL_DOWN
+	case "middle_mouse":
+		button.type = .MOUSE_BUTTON
+		button.mouse_button  = win.MOUSEEVENTF_MIDDLEDOWN
+		button.mouse_release  = win.MOUSEEVENTF_MIDDLEUP
+		
 	case "right_click":
 		button.type          = .MOUSE_BUTTON
 		button.mouse_button  = win.MOUSEEVENTF_RIGHTDOWN
@@ -254,6 +262,8 @@ load_config :: proc(path: string) -> Config {
 	config.controller.left_thumb_left  = config_to_button(m["buttons"]["left_thumb_left"])
 	config.controller.left_thumb_right = config_to_button(m["buttons"]["left_thumb_right"])
 	config.controller.left_thumb_click = config_to_button(m["buttons"]["left_thumb_click"])
+
+	config.controller.right_thumb_click = config_to_button(m["buttons"]["right_thumb_click"])
 
 	// Start / Select
 	config.controller.start  = config_to_button(m["buttons"]["start"])
