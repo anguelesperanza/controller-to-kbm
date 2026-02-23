@@ -14,6 +14,9 @@ This branch is not for testing x11/xlib support
 Research Notes:
 ---------------
 
+Running right now requires building the application `odin build .` and then runing the application with sudo `sudo ./controller-to-kbm`
+This is probably because my user account isn't in the right user groupd right now. Will need to figure this out though.
+
 Wayland doesn't support global hooking into windows like Windows does.
 Only feasible way to to use `uinput` and pass values through that.
 

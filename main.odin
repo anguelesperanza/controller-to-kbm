@@ -172,7 +172,7 @@ check_buttons :: proc(event_code: u16, event_value: i32, input_device: linux.Fd)
 main :: proc() {
 
 	fmt.println("Entered main")
-	// Step 1: open the controller
+	// Step 1: open the controller (this changed from event8 to event12 when I restared. Need a better way to set)
 	controller, err := os2.open("/dev/input/event12")
 	if err != nil {
 		fmt.eprintf("Could not open controller: %v", err)
