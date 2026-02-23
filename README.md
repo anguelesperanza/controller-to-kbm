@@ -27,11 +27,15 @@ Need to first however get controller input
 evdev → your mapper → uinput → compositor → focused window
 1       2             3        4            5
 
+
+
 Currenlty I can read input from the controller:
 Parts 1 and 2 are done (for the tests at least)
 
 Need parts 3, 4, 5
 
+
+Permissions: Either add to: sudo usermod -aG input $USER or use sudo
 
 According to Kernal Docs: https://kernel.org/doc/html/v4.12/input/uinput.html
 However that requires a dependecy; goal is to have as little dependencies as possible

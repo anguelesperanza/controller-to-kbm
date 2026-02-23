@@ -1,5 +1,6 @@
 package main
 
+import "core:mem"
 /*
 	Wayland testing
 	---------------
@@ -10,11 +11,12 @@ package main
 	
 */
 
-
 EV_SYN  :: 0
 EV_KEY  :: 1
 EV_REL  :: 2
 EV_ABS  :: 3
+
+SYN_REPORT :: 0x00
 
 // KEYS
 KEY_SPACE :: 57
@@ -26,32 +28,61 @@ _IOC_TYPESHIFT :: 8
 _IOC_NRSHIFT   :: 0
 _IOC_SIZESHIFT :: 16
 
-_IOC_WRITE :: 1
+_IOC_WRITE :: u64(1)
 
 UINPUT_IOCTL_BASE :: u64('U')
-
 
 UI_SET_EVBIT :: (_IOC_WRITE << _IOC_DIRSHIFT) |
                 (UINPUT_IOCTL_BASE << _IOC_TYPESHIFT) |
                 (u64(100) << _IOC_NRSHIFT) |
-                (u64(size_of(int)) << _IOC_SIZESHIFT)
+                (u64(4) << _IOC_SIZESHIFT)
+
+UI_SET_KEYBIT :: (_IOC_WRITE << _IOC_DIRSHIFT) |
+                 (UINPUT_IOCTL_BASE << _IOC_TYPESHIFT) |
+                 (u64(101) << _IOC_NRSHIFT) |
+                 (u64(4) << _IOC_SIZESHIFT)
+
+
+// UI_SET_EVBIT :: (_IOC_WRITE << _IOC_DIRSHIFT) |
+//                 (UINPUT_IOCTL_BASE << _IOC_TYPESHIFT) |
+//                 (u64(100) << _IOC_NRSHIFT) |
+//                 (u64(size_of(int)) << _IOC_SIZESHIFT)
+
+// UI_SET_KEYBIT :: (_IOC_WRITE << _IOC_DIRSHIFT) |
+//                  (UINPUT_IOCTL_BASE << _IOC_TYPESHIFT) |
+//                  (u64(101) << _IOC_NRSHIFT) |
+//                  (u64(size_of(int)) << _IOC_SIZESHIFT)
+
+// UI_SET_EVBIT :: (_IOC_WRITE << _IOC_DIRSHIFT) |
+//                 (UINPUT_IOCTL_BASE << _IOC_TYPESHIFT) |
+//                 (u64(100) << _IOC_NRSHIFT) |
+//                 (u64(8) << _IOC_SIZESHIFT)
+
+// UI_SET_KEYBIT :: (_IOC_WRITE << _IOC_DIRSHIFT) |
+//                  (UINPUT_IOCTL_BASE << _IOC_TYPESHIFT) |
+//                  (u64(101) << _IOC_NRSHIFT) |
+//                  (u64(8) << _IOC_SIZESHIFT)
 
 BUS_USB :: 0x03
 
+UINPUT_SETUP_SIZE :: 92
 
-// @(default_calling_convention="c")
-// foreign libc {
-// }
+UI_DEV_SETUP :: (_IOC_WRITE << _IOC_DIRSHIFT) |
+                (UINPUT_IOCTL_BASE << _IOC_TYPESHIFT) |
+                (u64(3) << _IOC_NRSHIFT) |
+                (u64(UINPUT_SETUP_SIZE) << _IOC_SIZESHIFT)
+
+UI_DEV_CREATE :: (UINPUT_IOCTL_BASE << _IOC_TYPESHIFT) | (u64(1) << _IOC_NRSHIFT)
+
 TimeVal :: struct {
-	tv_sec:i64,
-	tv_usec:i64,
+	tv_sec:  i64,
+	tv_usec: i64,
 }
 
-
 input_event :: struct {
-	time: TimeVal,
-	type: u16,
-	code: u16,
+	time:  TimeVal,
+	type:  u16,
+	code:  u16,
 	value: i32,
 }
 
@@ -71,16 +102,37 @@ uinput_setup :: struct {
 }
 
 import "core:fmt"
+import "core:time"
 import "core:os/os2"
-import "core:c/libc"
-import "core:sys/linux" // ioctl
-import "core:sys/posix" // opening a file that returns a file descriptor
+// import "core:c/libc"
+import "core:sys/linux"
+// import "core:sys/posix"
 
-check_buttons :: proc(event_code:u16, event_value:i32) {
+
+emit :: proc(fd: linux.Fd, type: u16, code: u16, value: i32) {
+	ie: input_event
+	ie.type  = type
+	ie.code  = code
+	ie.value = value
+
+    buf := mem.byte_slice(&ie, size_of(input_event))
+    _, _ = linux.write(fd, buf)
+
+}
+
+check_buttons :: proc(event_code: u16, event_value: i32, input_device: linux.Fd) {
 	switch event_code {
 		// Face buttons
 		case 304:
-			if event_value == 1 do fmt.println("Face Button Down Pressed")
+			if event_value == 1 {
+				fmt.println("Face Button Down Pressed")
+				emit(input_device, EV_KEY, KEY_SPACE, 1)
+				emit(input_device, EV_SYN, SYN_REPORT, 0)
+			} else {
+				emit(input_device, EV_KEY, KEY_SPACE, 0)
+				emit(input_device, EV_SYN, SYN_REPORT, 0)
+			}
+
 		case 305:
 			if event_value == 1 do fmt.println("Face Button Right Pressed")
 		case 307:
@@ -90,10 +142,10 @@ check_buttons :: proc(event_code:u16, event_value:i32) {
 
 		// Dpad
 		case 16:
-			if event_value == 1 do fmt.println("DPAD Right Pressed")
+			if event_value == 1  do fmt.println("DPAD Right Pressed")
 			if event_value == -1 do fmt.println("DPAD Left Pressed")
 		case 17:
-			if event_value == 1 do fmt.println("DPAD Down Pressed")
+			if event_value == 1  do fmt.println("DPAD Down Pressed")
 			if event_value == -1 do fmt.println("DPAD Up Pressed")
 
 		// Bumpers
@@ -101,7 +153,7 @@ check_buttons :: proc(event_code:u16, event_value:i32) {
 			if event_value == 1 do fmt.println("Bumper Left Pressed")
 		case 311:
 			if event_value == 1 do fmt.println("Bumper Right Pressed")
-	
+
 		// Triggers
 		case 2:
 			if event_value == 255 do fmt.println("Trigger Left Fully Pressed")
@@ -117,130 +169,89 @@ check_buttons :: proc(event_code:u16, event_value:i32) {
 	}
 }
 
-// emit :: proc(fd: ^os2.file, type:u16, code:u16, value:i32)
-// {
-//    ie:input_event;
-
-//    ie.type = type;
-//    ie.code = code;
-//    ie.value = value;
-//    /* timestamp values below are ignored */
-//    ie.time.tv_sec = 0;
-//    ie.time.tv_usec = 0;
-
-//    write(fd, &ie, sizeof(ie));
-// }
-
-
 main :: proc() {
-	// Step 1: the controller monitoring
-	controller, err := os2.open("/dev/input/event8")
 
+	fmt.println("Entered main")
+	// Step 1: open the controller
+	controller, err := os2.open("/dev/input/event12")
 	if err != nil {
 		fmt.eprintf("Could not open controller: %v", err)
 		return
 	}
 
-	// Step 2: input device used that will send commands to the compsitor (wayland)
-	//    int fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
-	input_device := posix.open(path = "/dev/uinput", flags = posix.O_Flags{.WRONLY, .NONBLOCK})
+	// Step 2: open uinput device
+    input_device, errno := linux.open(name = cstring("/dev/uinput"), flags = linux.Open_Flags{.WRONLY, .NONBLOCK})
 
+	fmt.println("Created input_device")
 
-	// open :: proc(path: cstring, flags: O_Flags, #c_vararg mode: ..mode_t) -> FD ---
+	// Step 3: register EV_KEY event type, then the specific key we want
+	// linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_EVBIT,  uintptr(EV_KEY))
+	// linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_KEYBIT, uintptr(KEY_SPACE))
+	ret1 := linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_EVBIT, uintptr(EV_SYN))
+	fmt.println("SET_EVBIT EV_SYN:", ret1)
 
-	// Step 3: Use ioctl to setup the commands for the input device
+	ret2 := linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_EVBIT, uintptr(EV_KEY))
+	fmt.println("SET_EVBIT EV_KEY:", ret2)
 
-	// posix FD and linux Fd are the datatype: i32 -- but each is a distinct so casting to the other
-	linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_EVBIT, EV_KEY)
-	linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_EVBIT, KEY_SPACE)
+	fmt.println("Registered EV_KEY events")
 
-	usetup:uinput_setup
+	// Step 4: configure the virtual device
+	usetup: uinput_setup
 	usetup.id.bustype = BUS_USB
-	usetup.id.vendor = 0x1234
+	usetup.id.vendor  = 0x1234
+	usetup.id.product = 0x5678
 
 
-	//    memset(&usetup, 0, sizeof(usetup));
-	//    usetup.id.bustype = BUS_USB;
-	//    usetup.id.vendor = 0x1234; /* sample vendor */
-	//    usetup.id.product = 0x5678; /* sample product */
-	//    strcpy(usetup.name, "Example device");
+	fmt.println("Configured the virutal device")
 
-	//    ioctl(fd, UI_DEV_SETUP, &usetup);
-	//    ioctl(fd, UI_DEV_CREATE);
+	name := "Example Device"
+	for i in 0..<len(name) {
+	    usetup.name[i] = name[i]
+	}
+	
+	mem.copy(dst = raw_data(usetup.name[:]), src = raw_data(name), len = len(name))
+
+	// linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_DEV_SETUP,  cast(uintptr)&usetup)
+
+	// // Step 5: create the device (no data argument needed, pass 0)
+	// linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_DEV_CREATE, 0)
+
+	// linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_EVBIT, uintptr(EV_SYN))
+	// linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_EVBIT, uintptr(EV_KEY))
+	// linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_KEYBIT, uintptr(KEY_SPACE))
+
+	ret3 := linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_KEYBIT, uintptr(KEY_SPACE))
+	fmt.println("SET_KEYBIT KEY_SPACE:", ret3)
+
+	ret4 := linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_DEV_SETUP, cast(uintptr)&usetup)
+	fmt.println("DEV_SETUP:", ret4)
+
+	ret5 := linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_DEV_CREATE, 0)
+	fmt.println("DEV_CREATE:", ret5)
 
 
-	// Step 4: Create the input event instance and query the controller
+	// Give user space time to pick up the new device
+	time.sleep(1 * time.Millisecond)
+
+	// Step 6: poll the controller and forward events
 	ev: input_event
 
 	for {
-		n:int
+		n: int
 		n, err = os2.read_ptr(controller, &ev, size_of(input_event))
 		if n == size_of(ev) {
-		
 			if err != nil {
-				fmt.eprintf("Could not open controller: %v", err)
+				fmt.eprintf("Could not read controller: %v", err)
 				return
 			}
 
-			check_buttons(ev.code, ev.value)
+			fmt.println(ev)
+			check_buttons(ev.code, ev.value, input_device)
 		}
 	}
 
-	// Final Step: Close out the input device and controller
-	posix.close(input_device)
+	// Final step: close devices
+	linux.close(input_device)
 	os2.close(controller)
-	
 }
 
-/*Below is the c code example from kernal docs*/
-
-
-// int main(void)
-// {
-//    struct uinput_setup usetup;
-
-//    int fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
-
-
-//    /*
-//     * The ioctls below will enable the device that is about to be
-//     * created, to pass key events, in this case the space key.
-//     */
-//    ioctl(fd, UI_SET_EVBIT, EV_KEY);
-//    ioctl(fd, UI_SET_KEYBIT, KEY_SPACE);
-
-//    memset(&usetup, 0, sizeof(usetup));
-//    usetup.id.bustype = BUS_USB;
-//    usetup.id.vendor = 0x1234; /* sample vendor */
-//    usetup.id.product = 0x5678; /* sample product */
-//    strcpy(usetup.name, "Example device");
-
-//    ioctl(fd, UI_DEV_SETUP, &usetup);
-//    ioctl(fd, UI_DEV_CREATE);
-
-//    /*
-//     * On UI_DEV_CREATE the kernel will create the device node for this
-//     * device. We are inserting a pause here so that userspace has time
-//     * to detect, initialize the new device, and can start listening to
-//     * the event, otherwise it will not notice the event we are about
-//     * to send. This pause is only needed in our example code!
-//     */
-//    sleep(1);
-
-//    /* Key press, report the event, send key release, and report again */
-//    emit(fd, EV_KEY, KEY_SPACE, 1);
-//    emit(fd, EV_SYN, SYN_REPORT, 0);
-//    emit(fd, EV_KEY, KEY_SPACE, 0);
-//    emit(fd, EV_SYN, SYN_REPORT, 0);
-
-//    /*
-//     * Give userspace some time to read the events before we destroy the
-//     * device with UI_DEV_DESTOY.
-//     */
-//    sleep(1);
-
-//    ioctl(fd, UI_DEV_DESTROY);
-//    close(fd);
-
-//    return 0;
-// }
