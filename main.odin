@@ -1,5 +1,6 @@
 package main
 
+import "core:strings"
 import "core:mem"
 /*
 	Wayland testing
@@ -21,8 +22,6 @@ SYN_REPORT :: 0x00
 // KEYS
 KEY_SPACE :: 57
 
-EVIOCGNAME :: 0x82004506  // example, depends on arch
-
 _IOC_DIRSHIFT  :: 30
 _IOC_TYPESHIFT :: 8
 _IOC_NRSHIFT   :: 0
@@ -42,27 +41,6 @@ UI_SET_KEYBIT :: (_IOC_WRITE << _IOC_DIRSHIFT) |
                  (u64(101) << _IOC_NRSHIFT) |
                  (u64(4) << _IOC_SIZESHIFT)
 
-
-// UI_SET_EVBIT :: (_IOC_WRITE << _IOC_DIRSHIFT) |
-//                 (UINPUT_IOCTL_BASE << _IOC_TYPESHIFT) |
-//                 (u64(100) << _IOC_NRSHIFT) |
-//                 (u64(size_of(int)) << _IOC_SIZESHIFT)
-
-// UI_SET_KEYBIT :: (_IOC_WRITE << _IOC_DIRSHIFT) |
-//                  (UINPUT_IOCTL_BASE << _IOC_TYPESHIFT) |
-//                  (u64(101) << _IOC_NRSHIFT) |
-//                  (u64(size_of(int)) << _IOC_SIZESHIFT)
-
-// UI_SET_EVBIT :: (_IOC_WRITE << _IOC_DIRSHIFT) |
-//                 (UINPUT_IOCTL_BASE << _IOC_TYPESHIFT) |
-//                 (u64(100) << _IOC_NRSHIFT) |
-//                 (u64(8) << _IOC_SIZESHIFT)
-
-// UI_SET_KEYBIT :: (_IOC_WRITE << _IOC_DIRSHIFT) |
-//                  (UINPUT_IOCTL_BASE << _IOC_TYPESHIFT) |
-//                  (u64(101) << _IOC_NRSHIFT) |
-//                  (u64(8) << _IOC_SIZESHIFT)
-
 BUS_USB :: 0x03
 
 UINPUT_SETUP_SIZE :: 92
@@ -71,6 +49,15 @@ UI_DEV_SETUP :: (_IOC_WRITE << _IOC_DIRSHIFT) |
                 (UINPUT_IOCTL_BASE << _IOC_TYPESHIFT) |
                 (u64(3) << _IOC_NRSHIFT) |
                 (u64(UINPUT_SETUP_SIZE) << _IOC_SIZESHIFT)
+
+_IOC_READ :: u64(2)
+
+EVIOCGNAME :: proc(length: u64) -> u64 {
+    return (_IOC_READ << _IOC_DIRSHIFT) |
+           (u64('E') << _IOC_TYPESHIFT) |
+           (u64(0x06) << _IOC_NRSHIFT) |
+           (length << _IOC_SIZESHIFT)
+}
 
 UI_DEV_CREATE :: (UINPUT_IOCTL_BASE << _IOC_TYPESHIFT) | (u64(1) << _IOC_NRSHIFT)
 
@@ -169,11 +156,45 @@ check_buttons :: proc(event_code: u16, event_value: i32, input_device: linux.Fd)
 	}
 }
 
-main :: proc() {
 
-	fmt.println("Entered main")
+find_controller_by_name :: proc(name:string) -> string {
+	files, err := os2.read_directory_by_path("/dev/input", 0, context.allocator)
+	if err != nil {
+		fmt.eprintf("Could not read /dev/input folder: %v", err)
+		return ""
+	}
+
+	for file in files {
+		result := strings.starts_with(file.name, "event")
+		if result {
+			controller, err := linux.open(strings.clone_to_cstring(file.fullpath), linux.Open_Flags{})
+			buf: [256]u8
+			linux.ioctl(controller, cast(u32)EVIOCGNAME(256), cast(uintptr)&buf)
+			linux.close(controller)
+
+			if strings.trim_null(string(buf[:])) == name {
+				return file.fullpath
+			}
+
+		}
+	}
+
+	return ""
+}
+
+
+/*BELOW IS WORKING MAIN: Uncomment once find out way to get propery input event*/
+
+main :: proc() {
 	// Step 1: open the controller (this changed from event8 to event12 when I restared. Need a better way to set)
-	controller, err := os2.open("/dev/input/event12")
+	controller_name := "Generic X-Box pad" 
+	input_file_name := find_controller_by_name(controller_name)
+
+	if input_file_name == "" {
+		fmt.printf("Could not find input called, %v\n", controller_name)
+		return
+	}
+	controller, err := os2.open(input_file_name)
 	if err != nil {
 		fmt.eprintf("Could not open controller: %v", err)
 		return
@@ -245,7 +266,7 @@ main :: proc() {
 				return
 			}
 
-			fmt.println(ev)
+			// fmt.println(ev)
 			check_buttons(ev.code, ev.value, input_device)
 		}
 	}
@@ -253,5 +274,7 @@ main :: proc() {
 	// Final step: close devices
 	linux.close(input_device)
 	os2.close(controller)
+
+	free_all(context.temp_allocator)
 }
 
