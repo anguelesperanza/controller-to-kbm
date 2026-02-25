@@ -1,16 +1,14 @@
 ### Controller input to Mouse and Keyboard Input
 
-This application is meant to run in the background. It converts controller input to mouse and keyboard input.
-Currenlty the buttons to KBM are hard coded. There are plans to work on a config file / config system of sorts
-so the program can read in a file and set the key mappings that way. But as this is still very early in development
-nothing has started on that yet.
+This is a small application that allows a controller to be used as a mouse and keyboard. This application is meant for playing games that do not have controller support.
+Currenlty works on windows however the process is not easy
 
-
+To run the application, you much launch it from the terminal `./controller-to-kbm.exe {name of the config to run}` for example `./controller-to-kbm.exe config/repo.ini`
 
 # Versions
-`Current version` 0.0.2-alpha
+`Current version` 0.0.3-alpha
 
-`WIP Version` 0.0.3-alpha
+`WIP Version` 0.0.4-wayland
 
 `Goal Version` 1.0.0-release
 
@@ -24,33 +22,20 @@ nothing has started on that yet.
 ## Why no other operating systems.
 MacOS: Don't own a Mac
 
-Linux/Unix: It would be complicated to handle input across Wayland and Xlib (at least) as I do swap between the two every so often.
-Upon finishing the windows version, but before v1.0.0-release, I want to look into this and see how doable it is.
+Linux: WIP Build. Did some testing on seems possible. Going to try an proper implementation.
+If all pans well, Linux support will be done before v1.0.0-release.
 
 ## Tested Games
-| Name         | Settings                                                                            |
-| ------------ | ----------------------------------------------------------------------------------- |
-| Hytale         | Works well. Ingame settings may need to be tweaked to liking                      |
-| Menace (Demo)  | Super Quick Testing (as I don't know how to play the game)                        |
-| New Arc Line   | Works well. No noticable perforamnce difference                                   | 
-| Demonologist   | Works well. No big performance lags, but there was some screen tearing            |
-| Relative Frame | Incorrect inputs are registering. Need to look into more to find out the reason   |
-| R.E.P.O        | Works fine. Passed the tutorial using controller                                  |
+| Name            | Settings                                                                            |
+| --------------- | ----------------------------------------------------------------------------------- |
+| Hytale (survival) | Works well. Ingame settings may need to be tweaked to liking                      |
+| Menace (Demo)     | Super Quick Testing (as I don't know how to play the game)                        |
+| New Arc Line      | Works well. No noticable perforamnce difference                                   | 
+| Demonologist      | Works well. No big performance lags, but there was some screen tearing            |
+| Relative Frame    | Incorrect inputs are registering. Issues with game even on mouse and keyboard     |
+| R.E.P.O           | Works fine. Played a round just fine                                              |
 
-
-
-## WIP Version Goal:
-
-`v0.0.3-alpha` will focues on creating a config based system to allow users to edit the keybindings.
-
-There is still quite a bit of figuring out to do for this so nothing is promised yet until more of this has been figured out.
-
-The rough idea is:
-
-- [x]Config files on a per game basis
-- [x]Implementing the remaining controller buttons (right thumbstick press (R3), Triggers)
-
-## Version History
+## Versions (Past Current Future) 
 
 Status: Done, WIP (Work In Progress), NSY (Not Started Yet)
 
@@ -58,11 +43,11 @@ Status | Version       | Description                                            
 |------|---------------|---------------------------------------------------------------------------|
 | Done | 0.0.1-alpha   | First release. Barely Usable, but rough                                   |
 | Done | 0.0.2-alpha   | Refined Joystick movement                                                 |
-| WIP  | 0.0.3-alpha   | Keymapping configs to change controller mappings on a per game basis      |
+| Done  | 0.0.3-alpha  | Keymapping configs to change controller mappings on a per game basis      |
 |      |               | Accidentely fixed lag issue (so far) with Hytle by reducing calls         |
-| NSY  | 0.0.4-wayland | Implemen Wayland (Linux) support                                          |
+| WIP  | 0.0.4-wayland | Implemen Wayland (Linux) support                                          |
 | NSY  | 0.0.5-ui      | Add Graphical User Interface                                              |
-| NSY  | 0.0.x-testing | Properly try out the tool with different games and adjust as needed       |
+| NSY  | 0.1.0-beta    | Properly try out the tool with different games and adjust as needed       |
 | NSY  | -----------   | Whatever number of versions that come before 1.0.0-release                |
 | NSY  | 1.0.0-release | Final Version (except for bug fixes). Has all features, all  suppored OS  | 
 
