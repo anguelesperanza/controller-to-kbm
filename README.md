@@ -62,6 +62,7 @@ Status | Version       | Description                                            
 |      |               | Accidentely fixed lag issue (so far) with Hytle by reducing calls         |
 | NSY  | 0.0.4-wayland | Implemen Wayland (Linux) support                                          |
 | NSY  | 0.0.5-ui      | Add Graphical User Interface                                              |
+| NSY  | 0.0.x-testing | Properly try out the tool with different games and adjust as needed       |
 | NSY  | -----------   | Whatever number of versions that come before 1.0.0-release                |
 | NSY  | 1.0.0-release | Final Version (except for bug fixes). Has all features, all  suppored OS  | 
 
