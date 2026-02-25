@@ -48,9 +48,7 @@ There is still quite a bit of figuring out to do for this so nothing is promised
 The rough idea is:
 
 - [x]Config files on a per game basis
-- [-]Swapping config files based on active windows (maybe)
 - [x]Implementing the remaining controller buttons (right thumbstick press (R3), Triggers)
-
 
 ## Version History
 
@@ -58,10 +56,12 @@ Status: Done, WIP (Work In Progress), NSY (Not Started Yet)
 
 Status | Version       | Description                                                               |
 |------|---------------|---------------------------------------------------------------------------|
-| Done | 0.0.1-alpha   | First release. Usable, but rough                                          |
+| Done | 0.0.1-alpha   | First release. Barely Usable, but rough                                   |
 | Done | 0.0.2-alpha   | Refined Joystick movement                                                 |
 | WIP  | 0.0.3-alpha   | Keymapping configs to change controller mappings on a per game basis      |
 |      |               | Accidentely fixed lag issue (so far) with Hytle by reducing calls         |
+| NSY  | 0.0.4-wayland | Implemen Wayland (Linux) support                                          |
+| NSY  | 0.0.5-ui      | Add Graphical User Interface                                              |
 | NSY  | -----------   | Whatever number of versions that come before 1.0.0-release                |
 | NSY  | 1.0.0-release | Final Version (except for bug fixes). Has all features, all  suppored OS  | 
 

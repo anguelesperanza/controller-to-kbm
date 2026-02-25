@@ -9,6 +9,7 @@ package main
 	Thumbstick and Deadzone: https://learn.microsoft.com/en-us/windows/win32/xinput/getting-started-with-xinput
 */
 
+import "core:fmt"
 import "core:math"
 import "core:time"
 import win "core:sys/windows"
@@ -141,7 +142,7 @@ handle_button :: proc(button: ^Button, is_pressed: bool, scroll_ready: bool, scr
 }
 
 main :: proc() {
-	config := load_config("./config/hytale.ini")
+	config := load_config("./config/relative_frame.ini")
 	// config := load_default_config()
 
 	for {
