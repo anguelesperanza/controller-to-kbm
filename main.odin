@@ -61,6 +61,32 @@ EVIOCGNAME :: proc(length: u64) -> u64 {
 
 UI_DEV_CREATE :: (UINPUT_IOCTL_BASE << _IOC_TYPESHIFT) | (u64(1) << _IOC_NRSHIFT)
 
+REL_X :: 0
+REL_Y :: 1
+
+UI_SET_RELBIT :: (_IOC_WRITE << _IOC_DIRSHIFT) |
+                 (UINPUT_IOCTL_BASE << _IOC_TYPESHIFT) |
+                 (u64(102) << _IOC_NRSHIFT) |
+                 (u64(4) << _IOC_SIZESHIFT)
+
+
+ABS_RX :: 3
+ABS_RY :: 4
+
+// Add a deadzone to avoid drift
+DEADZONE :: 8000
+
+
+ABS_X :: 0
+ABS_Y :: 1
+
+KEY_W :: 17
+KEY_A :: 30
+KEY_S :: 31
+KEY_D :: 32
+
+
+
 TimeVal :: struct {
 	tv_sec:  i64,
 	tv_usec: i64,
@@ -91,10 +117,7 @@ uinput_setup :: struct {
 import "core:fmt"
 import "core:time"
 import "core:os/os2"
-// import "core:c/libc"
 import "core:sys/linux"
-// import "core:sys/posix"
-
 
 emit :: proc(fd: linux.Fd, type: u16, code: u16, value: i32) {
 	ie: input_event
@@ -107,55 +130,101 @@ emit :: proc(fd: linux.Fd, type: u16, code: u16, value: i32) {
 
 }
 
-check_buttons :: proc(event_code: u16, event_value: i32, input_device: linux.Fd) {
-	switch event_code {
-		// Face buttons
-		case 304:
-			if event_value == 1 {
-				fmt.println("Face Button Down Pressed")
-				emit(input_device, EV_KEY, KEY_SPACE, 1)
-				emit(input_device, EV_SYN, SYN_REPORT, 0)
-			} else {
-				emit(input_device, EV_KEY, KEY_SPACE, 0)
-				emit(input_device, EV_SYN, SYN_REPORT, 0)
-			}
 
-		case 305:
-			if event_value == 1 do fmt.println("Face Button Right Pressed")
-		case 307:
-			if event_value == 1 do fmt.println("Face Button Left Pressed")
-		case 308:
-			if event_value == 1 do fmt.println("Face Button Up Pressed")
-
-		// Dpad
-		case 16:
-			if event_value == 1  do fmt.println("DPAD Right Pressed")
-			if event_value == -1 do fmt.println("DPAD Left Pressed")
-		case 17:
-			if event_value == 1  do fmt.println("DPAD Down Pressed")
-			if event_value == -1 do fmt.println("DPAD Up Pressed")
-
-		// Bumpers
-		case 310:
-			if event_value == 1 do fmt.println("Bumper Left Pressed")
-		case 311:
-			if event_value == 1 do fmt.println("Bumper Right Pressed")
-
-		// Triggers
-		case 2:
-			if event_value == 255 do fmt.println("Trigger Left Fully Pressed")
-		case 5:
-			if event_value == 255 do fmt.println("Trigger Right Fully Pressed")
-
-		// select
-		case 314:
-			if event_value == 1 do fmt.println("Select Pressed")
-		// start
-		case 315:
-			if event_value == 1 do fmt.println("Start Pressed")
-	}
+move_mouse :: proc(input_device: linux.Fd, dx: i32, dy: i32) {
+    emit(input_device, EV_REL, REL_X, dx)
+    emit(input_device, EV_REL, REL_Y, dy)
+    emit(input_device, EV_SYN, SYN_REPORT, 0)
 }
 
+check_buttons :: proc(event: input_event, input_device: linux.Fd) {
+    switch event.type {
+        case EV_KEY:
+            switch event.code {
+                // Face buttons
+                case 304:
+                    if event.value == 1 {
+                        fmt.println("Face Button Down Pressed")
+                        emit(input_device, EV_KEY, KEY_SPACE, 1)
+                        emit(input_device, EV_SYN, SYN_REPORT, 0)
+                    } else {
+                        emit(input_device, EV_KEY, KEY_SPACE, 0)
+                        emit(input_device, EV_SYN, SYN_REPORT, 0)
+                    }
+                case 305:
+                    if event.value == 1 do fmt.println("Face Button Right Pressed")
+                case 307:
+                    if event.value == 1 do fmt.println("Face Button Left Pressed")
+                case 308:
+                    if event.value == 1 do fmt.println("Face Button Up Pressed")
+                // Dpad
+                case 16:
+                    if event.value == 1  do fmt.println("DPAD Right Pressed")
+                if event.value == -1 do fmt.println("DPAD Left Pressed")
+                case 17:
+                    if event.value == 1  do fmt.println("DPAD Down Pressed")
+                    if event.value == -1 do fmt.println("DPAD Up Pressed")
+                // Bumpers
+                case 310:
+                    if event.value == 1 do fmt.println("Bumper Left Pressed")
+                case 311:
+                    if event.value == 1 do fmt.println("Bumper Right Pressed")
+                // Triggers
+                case 2:
+                    if event.value == 255 do fmt.println("Trigger Left Fully Pressed")
+                case 5:
+                    if event.value == 255 do fmt.println("Trigger Right Fully Pressed")
+                // Select
+                case 314:
+                    if event.value == 1 do fmt.println("Select Pressed")
+                // Start
+                case 315:
+                    if event.value == 1 do fmt.println("Start Pressed")
+            }
+        case EV_ABS:
+		    // fmt.println("ABS event - code:", event.code, "value:", event.value)
+            switch event.code {
+                case ABS_RX:
+		            // fmt.println("RX value:", event.value, "deadzone:", DEADZONE)
+                    if abs(event.value) > DEADZONE {
+                        dx := event.value / 500
+                        move_mouse(input_device, dx, 0)
+                    }
+                case ABS_RY:
+		            // fmt.println("RY value:", event.value, "deadzone:", DEADZONE)
+                    if abs(event.value) > DEADZONE {
+                        dy := event.value / 500
+                        move_mouse(input_device, 0, dy)
+                    }
+
+                case ABS_X:
+				    if event.value > DEADZONE {
+				        emit(input_device, EV_KEY, KEY_D, 1)
+				        emit(input_device, EV_KEY, KEY_A, 0)
+				    } else if event.value < -DEADZONE {
+				        emit(input_device, EV_KEY, KEY_A, 1)
+				        emit(input_device, EV_KEY, KEY_D, 0)
+				    } else {
+				        emit(input_device, EV_KEY, KEY_D, 0)
+				        emit(input_device, EV_KEY, KEY_A, 0)
+				    }
+				    emit(input_device, EV_SYN, SYN_REPORT, 0)
+
+				case ABS_Y:
+				    if event.value > DEADZONE {
+				        emit(input_device, EV_KEY, KEY_S, 1)
+				        emit(input_device, EV_KEY, KEY_W, 0)
+				    } else if event.value < -DEADZONE {
+				        emit(input_device, EV_KEY, KEY_W, 1)
+				        emit(input_device, EV_KEY, KEY_S, 0)
+				    } else {
+				        emit(input_device, EV_KEY, KEY_W, 0)
+				        emit(input_device, EV_KEY, KEY_S, 0)
+				    }
+				    emit(input_device, EV_SYN, SYN_REPORT, 0)
+            }
+    }
+}
 
 find_controller_by_name :: proc(name:string) -> string {
 	files, err := os2.read_directory_by_path("/dev/input", 0, context.allocator)
@@ -172,6 +241,8 @@ find_controller_by_name :: proc(name:string) -> string {
 			linux.ioctl(controller, cast(u32)EVIOCGNAME(256), cast(uintptr)&buf)
 			linux.close(controller)
 
+			fmt.println(string(buf[:]))
+
 			if strings.trim_null(string(buf[:])) == name {
 				return file.fullpath
 			}
@@ -182,12 +253,22 @@ find_controller_by_name :: proc(name:string) -> string {
 	return ""
 }
 
-
-/*BELOW IS WORKING MAIN: Uncomment once find out way to get propery input event*/
-
 main :: proc() {
+
+	fmt.println("UI_SET_EVBIT value:",  UI_SET_EVBIT)
+	fmt.println("UI_SET_RELBIT value:", UI_SET_RELBIT)
+	fmt.println("UI_SET_KEYBIT value:", UI_SET_KEYBIT)
+	fmt.println("UI_DEV_SETUP value:",  UI_DEV_SETUP)
+	fmt.println("UI_DEV_CREATE value:", UI_DEV_CREATE)
+
+	fmt.println()
+	
 	// Step 1: open the controller (this changed from event8 to event12 when I restared. Need a better way to set)
-	controller_name := "Generic X-Box pad" 
+	controller_name := "Generic X-Box pad"
+	// controller_name := "Valve Software Steam Deck Controller"	
+	// controller_name := "DualSense Wireless Controller"
+	// controller_name := "Xbox Wireless Controller"
+	// controller_name := "Microsoft X-Box 360 pad"
 	input_file_name := find_controller_by_name(controller_name)
 
 	if input_file_name == "" {
@@ -205,17 +286,6 @@ main :: proc() {
 
 	fmt.println("Created input_device")
 
-	// Step 3: register EV_KEY event type, then the specific key we want
-	// linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_EVBIT,  uintptr(EV_KEY))
-	// linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_KEYBIT, uintptr(KEY_SPACE))
-	ret1 := linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_EVBIT, uintptr(EV_SYN))
-	fmt.println("SET_EVBIT EV_SYN:", ret1)
-
-	ret2 := linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_EVBIT, uintptr(EV_KEY))
-	fmt.println("SET_EVBIT EV_KEY:", ret2)
-
-	fmt.println("Registered EV_KEY events")
-
 	// Step 4: configure the virtual device
 	usetup: uinput_setup
 	usetup.id.bustype = BUS_USB
@@ -225,6 +295,9 @@ main :: proc() {
 
 	fmt.println("Configured the virutal device")
 
+
+
+
 	name := "Example Device"
 	for i in 0..<len(name) {
 	    usetup.name[i] = name[i]
@@ -232,23 +305,20 @@ main :: proc() {
 	
 	mem.copy(dst = raw_data(usetup.name[:]), src = raw_data(name), len = len(name))
 
-	// linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_DEV_SETUP,  cast(uintptr)&usetup)
+	linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_EVBIT, uintptr(EV_SYN))
+	linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_EVBIT, uintptr(EV_REL))
+	linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_EVBIT, uintptr(EV_KEY))
+	linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_RELBIT, uintptr(REL_X))
+	linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_RELBIT, uintptr(REL_Y))
 
-	// // Step 5: create the device (no data argument needed, pass 0)
-	// linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_DEV_CREATE, 0)
+	linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_KEYBIT, uintptr(KEY_SPACE))
+	linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_KEYBIT, uintptr(KEY_W))
+	linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_KEYBIT, uintptr(KEY_A))
+	linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_KEYBIT, uintptr(KEY_S))
+	linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_KEYBIT, uintptr(KEY_D))
 
-	// linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_EVBIT, uintptr(EV_SYN))
-	// linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_EVBIT, uintptr(EV_KEY))
-	// linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_KEYBIT, uintptr(KEY_SPACE))
-
-	ret3 := linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_SET_KEYBIT, uintptr(KEY_SPACE))
-	fmt.println("SET_KEYBIT KEY_SPACE:", ret3)
-
-	ret4 := linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_DEV_SETUP, cast(uintptr)&usetup)
-	fmt.println("DEV_SETUP:", ret4)
-
-	ret5 := linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_DEV_CREATE, 0)
-	fmt.println("DEV_CREATE:", ret5)
+	linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_DEV_SETUP,  cast(uintptr)&usetup)
+	linux.ioctl(cast(linux.Fd)input_device, cast(u32)UI_DEV_CREATE, 0)
 
 
 	// Give user space time to pick up the new device
@@ -266,8 +336,8 @@ main :: proc() {
 				return
 			}
 
-			// fmt.println(ev)
-			check_buttons(ev.code, ev.value, input_device)
+			fmt.println(ev)
+			check_buttons(ev, input_device)
 		}
 	}
 

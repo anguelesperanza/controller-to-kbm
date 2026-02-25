@@ -11,6 +11,29 @@ This branch is not for testing x11/xlib support
 
 ==============================================
 
+Due to either Wayland being Wayland, or Cosmic DE being in Beta, the device was not properly sticking as being a mouse and keyboard device.
+As such, had to add the device to the udev list of controlls.
+
+had to add example-device rule: SUBSYSTEM=="input", ATTRS{name}=="Example Device", ENV{ID_INPUT_MOUSE}="1", ENV{ID_INPUT_KEY}="1"
+to this file: sudo nano /etc/udev/rules.d/99-example-device.rules
+
+This tells linux that the device is both a mouse and a keyboard
+
+Had to reload: sudo udevadm control --reload-rules
+sudo udevadm trigger
+
+Depending on the system, this may not be required and sudo ./name-of-application should be fine.
+
+
+## Result of Research:
+
+Should be possible to add Wayland support. And since thse way the input is sent is through kernal level feautres,
+it should work on other DEs, not just Wayland. However current version of PopOS only has Cosmic DE so I can't really tell.
+
+This is just an assumption. There's far too many DE's to just know if it will work across the board, as such, the linux development branch with be suffixed with -wayand.
+
+Next Development Version: v0.0.4-wayland 
+
 Research Notes:
 ---------------
 
